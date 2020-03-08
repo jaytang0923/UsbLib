@@ -32,8 +32,21 @@ namespace UsbLibConsole
 
             try
             {
-                Console.WriteLine($"Connect device: {usb.Connect("E")}");
+                Console.WriteLine($"Connect device: {usb.Connect("H")}");
 
+                Console.WriteLine("start read Inquiry");
+                if (usb.Execute(ScsiCommandCode.Inquiry))
+                {
+                    byte[] po = usb.Inquiry.Sptw.GetDataBuffer();
+
+                    Console.WriteLine("");
+                    Console.Write("Inquiry: ");
+                    for (int i = 0; i < 32; i++)
+                        Console.Write(string.Format("{0:X} ", po[i]));
+                }
+                else
+                    Console.WriteLine($"Bad command: {Marshal.GetLastWin32Error()}");
+                /*
                 if (usb.Execute(ScsiCommandCode.ReadCapacity))
                 {
                     ReadCapacity rc10 = usb.ReadCapacity;
@@ -48,17 +61,7 @@ namespace UsbLibConsole
                 }
                 else
                     Console.WriteLine($"Bad command: {Marshal.GetLastWin32Error()}");
-
-                if (usb.Execute(ScsiCommandCode.Inquiry))
-                {
-                    byte[] po = usb.Inquiry.Sptw.GetDataBuffer();
-
-                    Console.WriteLine("");
-                    Console.Write("Inquiry: ");
-                    for (int i = 0; i < 32; i++)
-                        Console.Write(string.Format("{0:X} ", po[i]));
-                }
-
+                */
 #if false
                 usb.Read10.SetBounds(0, 64);
                 usb.Read10.Sptw.SetCdb(new byte[]
@@ -75,6 +78,41 @@ namespace UsbLibConsole
                 Console.WriteLine("Data: ");
                 PrintBuffer(data, 0, 128);
 #else
+#if true
+                byte[] fwheader = usb.Read();
+                if (fwheader.Length == 0) {
+                    return;
+                }
+                Console.WriteLine("Get Info Success:\n");
+                PrintBuffer(fwheader, 0, fwheader.Length);
+
+                //send 00
+                byte[] array00 = new byte[] { 0x4d, 0x48, 0x31, 0x39, 0x30, 0x33, 0x20, 0x52, 0x4f, 0x4d, 0x20, 0x42, 0x4f, 0x4f, 0x54, 0x00};
+                //byte[] response0 = new byte[] { };
+                byte[] response0;
+                if (!usb.Write(array00, 16, out response0)) {
+                    return;
+                }
+                Console.WriteLine("Get Response00 length = {0}\n",response0.Length);
+                PrintBuffer(response0, 0, response0.Length);
+
+                //MH1903 Step 2,write 30
+
+                byte[] array = new byte[] { 0x4d, 0x48, 0x31, 0x39, 0x30, 0x33, 0x20, 0x52, 0x4f, 0x4d, 0x20, 0x42, 0x4f, 0x4f, 0x54, 0x00, 0x02, 0x30, 0x00, 0x00, 0x0d, 0xac, 0, 0, 0, 0, 0, 0, 0, 0 ,0,0};
+
+                if (!usb.Write(array,(UInt32)array.Length))
+                {
+                    Console.WriteLine("write step 2 error");
+                    return;
+                }
+                Console.WriteLine("write step 2 OK");
+
+                return;
+#endif
+
+
+
+
                 // offset in flash (use for GRUB)
                 UInt32 startByteAddress = 0x7E00;
                 UInt32 readLba = startByteAddress / 512;

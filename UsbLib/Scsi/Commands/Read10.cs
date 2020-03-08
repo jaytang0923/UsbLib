@@ -20,8 +20,8 @@ namespace UsbLib.Scsi.Commands
         }
 
         public Read10() :
-            base(new ScsiPassThroughWrapper(new byte[] { (byte) ScsiCommandCode.Read10, 0, 0, 0, 0, 0, 0, 0 }, 
-                DataDirection.SCSI_IOCTL_IN, 8))
+            base(new ScsiPassThroughWrapper(new byte[] { (byte) ScsiCommandCode.Read10, 0, 0, 4, 0, 0, 0, 0, 1}, 
+                DataDirection.SCSI_IOCTL_IN, 0x200))
         {
 
         }

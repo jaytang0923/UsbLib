@@ -21,12 +21,24 @@ namespace UsbLib
 
         public void Disconnect() => this.usb.Disconnect();
 
+        private byte[] MH1903Header = new byte[] { 0x4d, 0x48, 0x31, 0x39, 0x30, 0x33, 0x20, 0x52, 0x4f, 0x4d, 0x20, 0x42, 0x4f, 0x4f, 0x54, 0x00 };
+
         /// <summary>
         /// Execute scsi command by scsi code
         /// </summary>
         /// <param name="code">scsi command code</param>
         /// <returns>result operation</returns>
         public bool Execute(ScsiCommandCode code) => this.usb.Ioctl(this.Commands[code].Sptw);
+
+        public bool CheckByteArrayEquals(byte[] b1, int b1pos, byte[] b2, int b2pos, int checklen)
+        {
+            for (int i = 0; i < checklen; i++)
+            {
+                if (b1[b1pos + i] != b2[b2pos + i])
+                    return false;
+            }
+            return true;
+        }
 
         /// <summary>
         /// Read data from device
@@ -63,6 +75,28 @@ namespace UsbLib
             return data;
         }
 
+        /*read response */
+        public byte[] Read() {
+            byte []response = new byte[] { };
+            if (!this.Execute(ScsiCommandCode.Read10))
+            {
+                Console.WriteLine("Error Ioctl: 0x{0:X8}", this.usb.GetError());
+                return response;
+            }
+            var recdata = this.Read10.Sptw.GetDataBuffer();
+            int reslen = BitConverter.ToUInt16(recdata, 16 + 2);
+            Console.WriteLine("read response length {0}", reslen);
+
+            if (!CheckByteArrayEquals(recdata, 0, MH1903Header, 0, MH1903Header.Length)){
+                Console.WriteLine("Error MH1903 Header: 0x{0:X8}", this.usb.GetError());
+                return response;
+            }
+
+            response = new byte[reslen + 6];
+            Array.Copy(recdata, 16, response, 0, reslen + 4 + 2);
+            return response;
+        }
+
         /// <summary>
         /// Write data in device
         /// </summary>
@@ -88,6 +122,70 @@ namespace UsbLib
                 sectors -= transferSectorLength;
                 offset += transferBytes;
             }
+        }
+
+        /* write cmd and read ack*/
+        public bool Write(byte[] data, UInt32 datalen)
+        {
+            var buf = this.Write10.Sptw.GetDataBuffer();
+
+            Array.Copy(data, 0, buf, 0, datalen);
+            if (!this.Execute(ScsiCommandCode.Write10))
+            {
+                Console.WriteLine("Error Ioctl: 0x{0:X8}", this.usb.GetError());
+                return false;
+            }
+            //read timeout is 10*10
+            for (int i = 0; i < 3; i++)
+            {
+                if (!this.Execute(ScsiCommandCode.Read10))
+                {
+                    Console.WriteLine("Error Ioctl: 0x{0:X8}", this.usb.GetError());
+                    return false;
+                }
+                var recdata = this.Read10.Sptw.GetDataBuffer();
+                int reslen = BitConverter.ToUInt16(recdata, 16 + 2);
+                Console.WriteLine("read response length {0}",reslen);
+                if (!CheckByteArrayEquals(recdata, 16, new byte[] { 0x02, 0x80, 0x03, 0 ,0x28,0,0,0xB8,0x84}, 0, 9))
+                {
+                    for (int ch = 0; ch < 8; ch++)
+                    {
+                        Console.Write("{0:X}", recdata[16 + ch]);
+                    }
+                }
+                else {
+                    Console.WriteLine("WriteCMD Got ACK OK");
+                    return true;
+                }
+                System.Threading.Thread.Sleep(10);
+            }
+            return false;
+        }
+
+        /*send cmd and get response*/
+        public bool Write(byte[] data, UInt32 datalen, out byte[] response)
+        {
+            var buf = this.Write10.Sptw.GetDataBuffer();
+            response = new byte[] { };
+
+            Array.Copy(data, 0, buf, 0, datalen);
+            if (!this.Execute(ScsiCommandCode.Write10))
+            {
+                Console.WriteLine("Error Ioctl: 0x{0:X8}", this.usb.GetError());
+                return false;
+            }
+            if (!this.Execute(ScsiCommandCode.Read10))
+            {
+                Console.WriteLine("Error Ioctl: 0x{0:X8}", this.usb.GetError());
+                return false;
+            }
+            var recdata = this.Read10.Sptw.GetDataBuffer();
+            int reslen = BitConverter.ToUInt16(recdata,16 + 2);
+            Console.WriteLine("read response length {0}", reslen);
+
+            response = new byte[reslen + 6];
+            Array.Copy(recdata, 16, response, 0,reslen + 4 + 2);
+            return true;
         }
 
         private void PrintData(UInt32 lba, UInt32 sectors, byte[] data)
