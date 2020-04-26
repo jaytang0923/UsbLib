@@ -22,6 +22,8 @@ namespace UsbLib
         public void Disconnect() => this.usb.Disconnect();
 
         private byte[] MH1903Header = new byte[] { 0x4d, 0x48, 0x31, 0x39, 0x30, 0x33, 0x20, 0x52, 0x4f, 0x4d, 0x20, 0x42, 0x4f, 0x4f, 0x54, 0x00 };
+        private const int MH1903HeaderLen = 16;
+        private byte[] ACKPacket = new byte[] { 0x02, 0x80, 0x03, 0, 0x28, 0, 0, 0xB8, 0x84 };
 
         /// <summary>
         /// Execute scsi command by scsi code
@@ -97,6 +99,26 @@ namespace UsbLib
             return response;
         }
 
+        /*check the ack packet*/
+        private bool checkACK(byte[]response) {
+            return CheckByteArrayEquals(response, 0, ACKPacket, 0, ACKPacket.Length);
+        }
+
+        //first command read device info
+        public byte[] ReadDeviceInfo()
+        {
+            return Read();
+        }
+
+        private const byte CMD_USBSTART = 0x30;
+        /*send 0x30 cmd*/
+        public bool StartUSBConnect()
+        {
+            byte[] cmdpacket = packetCommand(CMD_USBSTART,new byte[] { });
+            byte[] response = ExecuteCommand(cmdpacket);
+            return checkACK(response);
+        }
+
         /// <summary>
         /// Write data in device
         /// </summary>
@@ -122,6 +144,156 @@ namespace UsbLib
                 sectors -= transferSectorLength;
                 offset += transferBytes;
             }
+        }
+
+        //计算CRC16
+        private byte[] CRC16_C(byte[] data, int datalen)
+        {
+            byte CRC16Lo;
+            byte CRC16Hi;           //CRC寄存器 
+            byte CL; byte CH;       //多项式码 ccitt的多项式是x16+x12+x5+1,多项式码是0x1021,但由于ccitt是默认先传LSB而不是MSB，故这里应该将多项式码按bit反转得到0x8408
+            byte SaveHi; byte SaveLo;
+            byte[] tmpData;
+            int Flag;
+            CRC16Lo = 0xFF;
+            CRC16Hi = 0xFF;
+            CL = 0x08;
+            CH = 0x84;
+            tmpData = data;
+            for (int i = 0; i < datalen; i++)
+            {
+                CRC16Lo = (byte)(CRC16Lo ^ tmpData[i]); //每一个数据与CRC寄存器进行异或 
+                for (Flag = 0; Flag <= 7; Flag++)
+                {
+                    SaveHi = CRC16Hi;
+                    SaveLo = CRC16Lo;
+                    CRC16Hi = (byte)(CRC16Hi >> 1);      //高位右移一位 
+                    CRC16Lo = (byte)(CRC16Lo >> 1);      //低位右移一位 
+                    if ((SaveHi & 0x01) == 0x01) //如果高位字节最后一位为1 
+                    {
+                        CRC16Lo = (byte)(CRC16Lo | 0x80);   //则低位字节右移后前面补1 
+                    }             //否则自动补0 
+                    if ((SaveLo & 0x01) == 0x01) //如果LSB为1，则与多项式码进行异或 
+                    {
+                        CRC16Hi = (byte)(CRC16Hi ^ CH);
+                        CRC16Lo = (byte)(CRC16Lo ^ CL);
+                    }
+                }
+            }
+            byte[] ReturnData = new byte[2];
+            ReturnData[0] = CRC16Hi;       //CRC高位 
+            ReturnData[1] = CRC16Lo;       //CRC低位 
+            return ReturnData;
+        }
+
+        private const byte SYNC = 0x02;
+
+        /*packet cmd and cmddata and calc the crc16*/
+        private byte[] packetCommand(byte cmd,byte[]cmddata)
+        {
+            ushort datalen = (ushort)cmddata.Length;
+            byte[] cmdpacket = new byte[datalen + 6];
+            cmdpacket[0] = SYNC;
+            cmdpacket[1] = cmd;
+            //data length
+            Array.Copy(BitConverter.GetBytes(datalen), 0, cmdpacket, 2, 2);
+            //data
+            if(datalen > 0)
+            {
+                Array.Copy(cmddata, 0, cmdpacket, 4, datalen);
+            }
+
+            //calc crc16
+            byte[] crc16 = CRC16_C(cmdpacket,4+datalen);
+            Array.Copy(crc16, 0, cmdpacket, 4+datalen, 2);
+            return cmdpacket;
+        }
+
+        /*send 2a with all zero data and get response data*/
+        private bool ExecuteNullCommand()
+        {
+            byte[] zerodata = new byte[] { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+            byte[] buf = this.Write10.Sptw.GetDataBuffer();
+            Array.Copy(zerodata, 0, buf, 0, zerodata.Length);
+            //1.send cmd and data
+            if (!this.Execute(ScsiCommandCode.Write10))
+            {
+                Console.WriteLine("Error Ioctl: 0x{0:X8}", this.usb.GetError());
+                return false;
+            }
+
+            //2.read data
+            if (!this.Execute(ScsiCommandCode.Read10))
+            {
+                Console.WriteLine("Error Ioctl: 0x{0:X8}", this.usb.GetError());
+                return false;
+            }
+            byte[] recdata = this.Read10.Sptw.GetDataBuffer();
+
+            if (!CheckByteArrayEquals(recdata, MH1903HeaderLen, zerodata, 0, zerodata.Length))
+            {
+                return false;
+            }
+            return true;
+        }
+
+        /*execute cmd and get response*/
+        public byte[] ExecuteCommand(byte[] cmdpacket) {
+            byte[] response = new byte[] { };
+            //0.send null command for clean cmd area.
+            if (!ExecuteNullCommand())
+            {
+                Console.WriteLine("Error : ExecuteNullCommand");
+                return response;
+            }
+
+            //1.send command
+            var buf = this.Write10.Sptw.GetDataBuffer();
+
+            Array.Copy(cmdpacket, 0, buf, 0, cmdpacket.Length);
+            if (!this.Execute(ScsiCommandCode.Write10))
+            {
+                Console.WriteLine("Error Ioctl: 0x{0:X8}", this.usb.GetError());
+                return response;
+            }
+
+            ////2.read response   read timeout is 10*10
+            ushort reslen = 0;
+            byte[] recdata = null;
+            for (int i = 0; i < 10; i++)
+            {
+                if (!this.Execute(ScsiCommandCode.Read10))
+                {
+                    Console.WriteLine("Error Ioctl: 0x{0:X8}", this.usb.GetError());
+                    return response;
+                }
+                recdata = this.Read10.Sptw.GetDataBuffer();
+                reslen = BitConverter.ToUInt16(recdata, MH1903HeaderLen + 2);
+                Console.WriteLine("read response length {0}", reslen);
+                if (reslen == 0)
+                    continue;
+                if (!CheckByteArrayEquals(recdata, MH1903HeaderLen, ACKPacket, 0, ACKPacket.Length))
+                {
+                    for (int ch = 0; ch < 8; ch++)
+                    {
+                        Console.Write("{0:X}", recdata[MH1903HeaderLen + ch]);
+                    }
+                }
+                else
+                {
+                    Console.WriteLine("ExecuteCommand Got ACK OK");
+                    break;
+                }
+                System.Threading.Thread.Sleep(10);
+            }
+            
+            //check response,SYNC CMD + LEN0 + LEN1 + DATA CRC0 CRC1
+            if(reslen > 0)
+            {
+                response = new byte[reslen + 6];
+                Array.Copy(recdata, MH1903HeaderLen,response,0,reslen + 6);
+            }
+            return response;
         }
 
         /* write cmd and read ack*/
@@ -155,6 +327,45 @@ namespace UsbLib
                 }
                 else {
                     Console.WriteLine("WriteCMD Got ACK OK");
+                    return true;
+                }
+                System.Threading.Thread.Sleep(10);
+            }
+            return false;
+        }
+
+        public bool Write(byte[] data, UInt32 datalen, UInt32 timeout)
+        {
+            var buf = this.Write10.Sptw.GetDataBuffer();
+
+            Array.Copy(data, 0, buf, 0, datalen);
+            if (!this.Execute(ScsiCommandCode.Write10))
+            {
+                Console.WriteLine("Error Ioctl: 0x{0:X8}", this.usb.GetError());
+                return false;
+            }
+            //read timeout is 10*10
+            for (int i = 0; i < timeout/10; i++)
+            {
+                if (!this.Execute(ScsiCommandCode.Read10))
+                {
+                    Console.WriteLine("Error Ioctl: 0x{0:X8}", this.usb.GetError());
+                    return false;
+                }
+                var recdata = this.Read10.Sptw.GetDataBuffer();
+                int reslen = BitConverter.ToUInt16(recdata, 16 + 2);
+                //Console.WriteLine("read response length {0}", reslen);
+                if (!CheckByteArrayEquals(recdata, 16, new byte[] { 0x02, 0x80, 0x03, 0, 0x28, 0, 0, 0xB8, 0x84 }, 0, 9))
+                {
+                    for (int ch = 0; ch < 8; ch++)
+                    {
+                        Console.Write("{0:X}", recdata[16 + ch]);
+                    }
+                    Console.Write("\n");
+                }
+                else
+                {
+                    Console.WriteLine("WriteCMD Got ACK OK,take {0}ms\n",i*10);
                     return true;
                 }
                 System.Threading.Thread.Sleep(10);

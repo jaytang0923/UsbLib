@@ -14,6 +14,12 @@ namespace UsbLibConsole
 
     class Program
     {
+        static UsbScsiDevice usb;
+        public Program()
+        {
+            
+        }
+
         static void PrintBuffer(byte[] buf, int start, int count)
         {
             for (int i = start; i < count; i++)
@@ -27,14 +33,12 @@ namespace UsbLibConsole
                     
         }
 
-        static void UsbDriverTest(String filename)
+        private static void UsbDriverTest(String filename)
         {
-            UsbScsiDevice usb = new UsbScsiDevice();
-
             
-
             try
             {
+                usb = new UsbScsiDevice();
                 Console.WriteLine($"Connect device: {usb.Connect("H")}");
 
                 Console.WriteLine("start read Inquiry");
@@ -65,22 +69,6 @@ namespace UsbLibConsole
                 else
                     Console.WriteLine($"Bad command: {Marshal.GetLastWin32Error()}");
                 */
-#if false
-                usb.Read10.SetBounds(0, 64);
-                usb.Read10.Sptw.SetCdb(new byte[]
-                {
-                    (byte) ScsiCommandCode.Read10, 0,
-                    0, 0, 0, 64,
-                    0,
-                    0, 64,
-                    0
-                });
-                usb.Execute(ScsiCommandCode.Read10);
-                var data = usb.Read10.Sptw.GetDataBuffer();
-                Console.WriteLine("");
-                Console.WriteLine("Data: ");
-                PrintBuffer(data, 0, 128);
-#else
 #if true
                 byte[] fwheader = usb.Read();
                 if (fwheader.Length == 0) {
@@ -99,88 +87,33 @@ namespace UsbLibConsole
                 PrintBuffer(response0, 0, response0.Length);
 
                 //MH1903 Step 2,write 30
-
-                byte[] array = new byte[] { 0x4d, 0x48, 0x31, 0x39, 0x30, 0x33, 0x20, 0x52, 0x4f, 0x4d, 0x20, 0x42, 0x4f, 0x4f, 0x54, 0x00, 0x02, 0x30, 0x00, 0x00, 0x0d, 0xac, 0, 0, 0, 0, 0, 0, 0, 0 ,0,0};
-                byte[] handleshake = new byte[0];
-                byte[] handleshakepkt = packetdata((byte)0x30, handleshake);
-                byte[] usbpkt = new byte[handleshakepkt.Length + array00.Length];
-                Array.Copy(array00,0,usbpkt,0,array00.Length);
-                Array.Copy(handleshakepkt, 0, usbpkt,array00.Length, handleshakepkt.Length);
-
-                string msg = PrintByteArray(usbpkt);
-                Console.WriteLine(msg);
-                if (!usb.Write(usbpkt, (UInt32)usbpkt.Length))
+                if (handleshake() != 0)
                 {
-                    Console.WriteLine("write step 2 error");
+                    Console.WriteLine("handleshake error\n");
                     return;
                 }
-                Console.WriteLine("write step 2 OK");
+                Console.WriteLine("handleshake ok\n");
 
 
                 //start step 3
-                Console.WriteLine("Start step 3,send firmware head\n");
-                byte[] fmheadarray = new byte[92];
-                //add fixed head
-                int oft = 0;
-
-                //0x5555aaaa
-                Array.Copy(new byte[] {0xaa,0xaa, 0x55, 0x55,0,0,0,0}, 0, fmheadarray, oft, 8);
-                oft += 8;
-
-                //firmware start address ,fixed to 0x01001000
-                Array.Copy(new byte[] { 0x00, 0x10, 0x00, 0x01}, 0, fmheadarray, oft, 4);
-                oft += 4;
-
-                //firmware size
-                long filesize = GetFileSize(filename);
-                if (filesize == 0) {
-                    Console.WriteLine("error:file size is %d\n",filesize);
-                    return;
-                }
-                fmheadarray[oft] = (byte)(filesize &0xff);
-                fmheadarray[oft+1] = (byte)(filesize >>8 & 0xff);
-                fmheadarray[oft+2] = (byte)(filesize >>16 & 0xff);
-                fmheadarray[oft+3] = (byte)(filesize >>24 & 0xff);
-                oft += 4;
-
-
-                //firmware ver and sha256 option
-                Array.Copy(new byte[] { 0xff, 0xff, 0x00, 0x00,2,0,0,0 }, 0, fmheadarray, oft, 8);
-                oft += 8;
-
-                //firmware sha256 valuse
-                byte[] sha256 = SHA256File(filename);
-                Array.Copy(sha256, 0, fmheadarray, oft, sha256.Length);
-                oft += sha256.Length;
-
-                oft += 32;
-
-                //crc32 values
-                int crc32 = GetCRC32(fmheadarray,4,oft - 4);
-                fmheadarray[oft] = (byte)(crc32 & 0xff);
-                fmheadarray[oft + 1] = (byte)(crc32 >> 8 & 0xff);
-                fmheadarray[oft + 2] = (byte)(crc32 >> 16 & 0xff);
-                fmheadarray[oft + 3] = (byte)(crc32 >> 24 & 0xff);
-                oft += 4;
-                Console.WriteLine("Crc32={0} {1}\n", crc32,oft);
-
-                byte[] fmheadpkt = packetdata((byte)0x20 , fmheadarray);
-
-                string hd = PrintByteArray(fmheadpkt);
-
-                
-
-                usbpkt = new byte[fmheadpkt.Length + array00.Length];
-                Array.Copy(array00, 0, usbpkt, 0, array00.Length);
-                Array.Copy(fmheadpkt, 0, usbpkt, array00.Length, fmheadpkt.Length);
-                Console.WriteLine(PrintByteArray(usbpkt));
-                if (!usb.Write(usbpkt, (UInt32)usbpkt.Length))
+                Console.WriteLine("erase all flash\n");
+                if (writefirmwarehead(filename) != 0)
                 {
-                    Console.WriteLine("write step 3 error");
+                    Console.WriteLine("writefirmwarehead error\n");
                     return;
                 }
-                Console.WriteLine("write step 3 OK");
-#endif
+                Console.WriteLine("writefirmwarehead OK\n");
+
+                //step 4 erase flash
+                Console.WriteLine("erase all flash\n");
+                if (eraseflash() != 0)
+                {
+                    Console.WriteLine("erase all flash error\n");
+                    return;
+                }
+                Console.WriteLine("erase all flash OK\n");
+
+
 #endif
 
             }
@@ -189,6 +122,160 @@ namespace UsbLibConsole
                 Console.WriteLine($"Exception: {e.Message}");
                 usb.Disconnect();
             }
+        }
+
+        private static byte[] Int32ToBytes(uint number)
+        {
+            //lsb
+            byte[] bs = new byte[4];
+            byte a = (byte)(number >> 24);
+            byte b = (byte)((number & 0xff0000) >> 16);
+            byte c = (byte)((number & 0xff00) >> 8);
+            byte d = (byte)(number & 0xff);
+            bs[0] = d;
+            bs[1] = c;
+            bs[2] = b;
+            bs[3] = a;
+            return bs;
+        }
+
+        private static int executecmd(byte cmd, byte[]cmddata)
+        {
+            
+            byte[] arrayhead = new byte[] { 0x4d, 0x48, 0x31, 0x39, 0x30, 0x33, 0x20, 0x52, 0x4f, 0x4d, 0x20, 0x42, 0x4f, 0x4f, 0x54, 0x00 };
+            byte[] cmdpkt = packetdata(cmd, cmddata);
+            byte[] usbpkt = new byte[arrayhead.Length + cmdpkt.Length];
+            Array.Copy(arrayhead, 0, usbpkt, 0, arrayhead.Length);
+            Array.Copy(cmdpkt, 0, usbpkt, arrayhead.Length, cmdpkt.Length);
+
+            string msg = PrintByteArray(usbpkt);
+            Console.WriteLine(msg);
+            if (!usb.Write(usbpkt, (UInt32)usbpkt.Length))
+            {
+                Console.WriteLine("write usbpkt error");
+                return -1;
+            }
+            Console.WriteLine("write CMD{0:X} OK\n",cmd);
+            return 0;
+        }
+
+        private static int executecmd(byte cmd, byte[] cmddata, UInt32 timeout)
+        {
+
+            byte[] arrayhead = new byte[] { 0x4d, 0x48, 0x31, 0x39, 0x30, 0x33, 0x20, 0x52, 0x4f, 0x4d, 0x20, 0x42, 0x4f, 0x4f, 0x54, 0x00 };
+            byte[] cmdpkt = packetdata(cmd, cmddata);
+            byte[] usbpkt = new byte[arrayhead.Length + cmdpkt.Length];
+            Array.Copy(arrayhead, 0, usbpkt, 0, arrayhead.Length);
+            Array.Copy(cmdpkt, 0, usbpkt, arrayhead.Length, cmdpkt.Length);
+
+            string msg = PrintByteArray(usbpkt);
+            Console.WriteLine(msg);
+            if ( !usb.Write(usbpkt, (UInt32)usbpkt.Length, timeout) )
+            {
+                Console.WriteLine("write usbpkt error");
+                return -1;
+            }
+            Console.WriteLine("write CMD:{0:X} OK\n", cmd);
+            return 0;
+        }
+
+        private static int handleshake()
+        {
+            byte[] data = new byte[0];
+            if (executecmd((byte)0x30, data) != 0)
+            {
+                return -1;
+            }
+            return 0;
+        }
+
+        private static int writefirmwarehead(string filename)
+        {
+            Console.WriteLine("Start step 3,send firmware head\n");
+            byte[] fmheadarray = new byte[92];
+            //add fixed head
+            int oft = 0;
+
+            //0x5555aaaa
+            Array.Copy(new byte[] { 0xaa, 0xaa, 0x55, 0x55, 0, 0, 0, 0 }, 0, fmheadarray, oft, 8);
+            oft += 8;
+
+            //firmware start address ,fixed to 0x01001000
+            Array.Copy(new byte[] { 0x00, 0x10, 0x00, 0x01 }, 0, fmheadarray, oft, 4);
+            oft += 4;
+
+            //firmware size
+            long filesize = GetFileSize(filename);
+            if (filesize == 0)
+            {
+                Console.WriteLine("error:file size is %d\n", filesize);
+                return -2;
+            }
+            fmheadarray[oft] = (byte)(filesize & 0xff);
+            fmheadarray[oft + 1] = (byte)(filesize >> 8 & 0xff);
+            fmheadarray[oft + 2] = (byte)(filesize >> 16 & 0xff);
+            fmheadarray[oft + 3] = (byte)(filesize >> 24 & 0xff);
+            oft += 4;
+
+
+            //firmware ver and sha256 option
+            Array.Copy(new byte[] { 0xff, 0xff, 0x00, 0x00, 2, 0, 0, 0 }, 0, fmheadarray, oft, 8);
+            oft += 8;
+
+            //firmware sha256 valuse
+            byte[] sha256 = SHA256File(filename);
+            Array.Copy(sha256, 0, fmheadarray, oft, sha256.Length);
+            oft += sha256.Length;
+
+            oft += 32;
+
+            //crc32 values
+            int crc32 = GetCRC32(fmheadarray, 4, oft - 4);
+            fmheadarray[oft] = (byte)(crc32 & 0xff);
+            fmheadarray[oft + 1] = (byte)(crc32 >> 8 & 0xff);
+            fmheadarray[oft + 2] = (byte)(crc32 >> 16 & 0xff);
+            fmheadarray[oft + 3] = (byte)(crc32 >> 24 & 0xff);
+            oft += 4;
+            Console.WriteLine("Crc32={0} {1}\n", crc32, oft);
+
+            if ( executecmd((byte)0x20, fmheadarray) != 0 )
+            {
+                return -1;
+            }
+            return 0;
+        }
+
+        private static int eraseflash(UInt32 startaddress,UInt32 sectors, UInt32 timeout)
+        {
+            UInt32 erasestartaddr = startaddress - 0x1000000;
+            byte[] buf = new byte[12];
+            Array.Copy(Int32ToBytes(erasestartaddr),0,buf,0,4);
+            Array.Copy(Int32ToBytes(sectors), 0, buf, 4, 4);
+            Array.Copy(Int32ToBytes(0x1000), 0, buf, 8, 4);
+
+            if (executecmd((byte)0x22, buf, timeout) != 0)
+            {
+                Console.WriteLine("Erase flash error\n");
+                return -1;
+            }
+            Console.WriteLine("Erase flash ok\n");
+            return 0;
+        }
+
+        private static int eraseflash()
+        {
+            /*if (eraseflash((UInt32)0x1000000, (UInt32)1, 260) != 0)
+            {
+                Console.WriteLine("erase flash 1 error\n");
+                return -1;
+            }*/
+
+            if (eraseflash((UInt32)0x1000000, (UInt32)0xFFFFFFFF, 20000) != 0)
+            {
+                Console.WriteLine("erase all flash error\n");
+                return -2;
+            }
+            return 0;
         }
 
         private static string PrintByteArray(byte[] array)
