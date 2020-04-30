@@ -377,9 +377,7 @@ namespace UsbLibConsole
                     {
                         //fixed the download address 0x1001000
                         Array.Copy(BitConverter.GetBytes(dladdr + oft), 0, data, 0, 4);
-
-                        PrintBuffer(alldata, 0, rlen + 8);
-                        if (usb.Write(data, (Int32)(addr + oft)) != true)
+                        if (usb.Write(data, rlen + 4,(Int32)(addr + oft)) != true)
                         {
                             Console.WriteLine("Error: writefirmwardata\n");
                             ret = -2;

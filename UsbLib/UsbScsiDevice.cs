@@ -215,6 +215,8 @@ namespace UsbLib
             byte[] zerodata = new byte[256]; //{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
             byte[] buf = this.Write10.Sptw.GetDataBuffer();
 
+            this.Write10.SetBounds(0x040000, 1);
+
             Array.Copy(MH1903Header, 0, zerodata, 0, MH1903HeaderLen);
             Array.Copy(zerodata, 0, buf, 0, zerodata.Length);
             //1.send cmd and data
@@ -423,17 +425,17 @@ namespace UsbLib
             return true;
         }
         //write data to 0x08000000 ~ 0x08020000  //128K
-        public bool Write(byte[] data, Int32 address)
+        public bool Write(byte[] data, int dlen,Int32 address)
         {
             UInt32 offset = 0;
             UInt32 addr = (UInt32)address;
             UInt32 blksize = 512;
             
             {
-                while (offset < data.Length)
+                while (offset < dlen)
                 {
                     var buf = this.Write10.Sptw.GetDataBuffer();
-                    if (offset + blksize < data.Length)
+                    if (offset + blksize < dlen)
                     {
                         Array.Copy(data, offset, buf, 0, blksize);
                     }
@@ -444,7 +446,8 @@ namespace UsbLib
                             data[i] = 0;
                         }*/
                         byte[] zero = new byte[blksize];
-                        Array.Copy(zero, 0, buf, data.Length - offset,  blksize - (data.Length - offset) );
+                        Array.Copy(data, offset, buf, 0, dlen - offset);
+                        Array.Copy(zero, 0, buf, dlen - offset,  blksize - (dlen - offset) );
                     }
                     this.Write10.SetBounds(addr, 1);
                     PrintBuffer(this.Write10.Sptw.sptBuffered.Spt.Cdb, 0,10);
