@@ -39,6 +39,11 @@ namespace UsbLibConsole
             try
             {
                 usb = new UsbScsiDevice();
+                if(false){
+                    byte[] data = new byte[1024];
+                    usb.Write(data,(Int32)0x08000000);
+                    return;
+                }
                 Console.WriteLine($"Connect device: {usb.Connect("H")}");
 
                 Console.WriteLine("start read Inquiry");
@@ -113,6 +118,14 @@ namespace UsbLibConsole
                 }
                 Console.WriteLine("erase all flash OK\n");
 
+                //step4 download files
+                Console.WriteLine("downloadFile\n");
+                if (downloadFile(filename) != 0)
+                {
+                    Console.WriteLine("downloadFile error\n");
+                    return;
+                }
+                Console.WriteLine("downloadFile OK\n");
 
 #endif
 
@@ -176,6 +189,35 @@ namespace UsbLibConsole
                 return -1;
             }
             Console.WriteLine("write CMD:{0:X} OK\n", cmd);
+            return 0;
+        }
+
+        private static int executecmd21(ushort datalen, ushort crc16, UInt32 timeout)
+        {
+
+            byte[] arrayhead = new byte[] { 0x4d, 0x48, 0x31, 0x39, 0x30, 0x33, 0x20, 0x52, 0x4f, 0x4d, 0x20, 0x42, 0x4f, 0x4f, 0x54, 0x00 };
+            byte[] cmdpkt = new byte[6];//packetdata((byte)0x21, cmddata);
+            byte[] usbpkt = new byte[arrayhead.Length + cmdpkt.Length];
+
+            cmdpkt[0] = 0x02;
+            cmdpkt[1] = 0x21;
+            cmdpkt[2] = (byte)(datalen&0xff);
+            cmdpkt[3] = (byte)((datalen>>8) & 0xff);
+
+            cmdpkt[4] = (byte)(crc16 & 0xff);
+            cmdpkt[5] = (byte)((crc16 >> 8) & 0xff);
+
+            Array.Copy(arrayhead, 0, usbpkt, 0, arrayhead.Length);
+            Array.Copy(cmdpkt, 0, usbpkt, arrayhead.Length, cmdpkt.Length);
+
+            string msg = PrintByteArray(usbpkt);
+            Console.WriteLine(msg);
+            if (!usb.Write(usbpkt, (UInt32)usbpkt.Length,1000))
+            {
+                Console.WriteLine("write usbpkt error");
+                return -1;
+            }
+            Console.WriteLine("write CMD: 21 OK\n");
             return 0;
         }
 
@@ -275,7 +317,115 @@ namespace UsbLibConsole
                 Console.WriteLine("erase all flash error\n");
                 return -2;
             }
+
+            //clean data area
+            if (!usb.ExecuteNullCommand()) {
+                Console.WriteLine("Error:ExecuteNullCommand!\n");
+                return -3;
+            }
             return 0;
+        }
+
+        private static int writefirmwaredata(UInt32 addr, int size)
+        {
+            int oft = 0;
+            return 0;
+        }
+        private static int writefirmwarecmd(UInt16 size, UInt16 crc16)
+        {
+            var sizebytes = BitConverter.GetBytes(size).Reverse<byte>().ToArray();
+            var crc16bytes = BitConverter.GetBytes(crc16).Reverse<byte>().ToArray();
+            byte[] data = new byte[4];
+            Array.Copy(sizebytes, 0, data, 0, 2);
+            Array.Copy(crc16bytes, 0, data, 2, 2);
+            PrintBuffer(data, 0, data.Length);
+            if (executecmd21(size,crc16, 3000) != 0)
+            {
+                return -1;
+            }
+            return 0;
+        }
+
+        private static int cleandata()
+        {
+            if (!usb.ExecuteNullCommand())
+            {
+                Console.WriteLine("Error : ExecuteNullCommand");
+                return -1;
+            }
+            return 0;
+        }
+
+        private static int downloadFile(string filename)
+        {
+            try
+            {
+                System.IO.FileStream fileStream = System.IO.File.OpenRead(filename);
+                int oft=0,rlen = 0;
+                int ret = -1;
+                int onelen = 0x8000;
+                UInt32 addr = 0x080000;
+                UInt32 dladdr = 0x1001000;
+                byte[] data = new byte[onelen + 4];
+                byte[] alldata = new byte[data.Length + 4];
+                ushort crc16;
+
+                while (true)
+                {
+                    rlen = fileStream.Read(data, 4, onelen);
+                    if (rlen > 0)
+                    {
+                        //fixed the download address 0x1001000
+                        Array.Copy(BitConverter.GetBytes(dladdr + oft), 0, data, 0, 4);
+
+                        PrintBuffer(alldata, 0, rlen + 8);
+                        if (usb.Write(data, (Int32)(addr + oft)) != true)
+                        {
+                            Console.WriteLine("Error: writefirmwardata\n");
+                            ret = -2;
+                            break;
+                        }
+
+                        Array.Copy(new byte[] { 2,0x21,0x0c,0x0}, 0, alldata, 0, 4);
+                        Array.Copy(data, 0, alldata, 4, rlen + 4);
+                        crc16 = CRC16(alldata, rlen + 8);
+                        PrintBuffer(alldata, 0,rlen + 8);
+                        Console.WriteLine("crc16: {0:X} {1:X}\n",crc16,rlen);
+                        //send 21 cmd
+                        if (writefirmwarecmd((ushort)(rlen + 4),crc16) != 0)
+                        {
+                            Console.WriteLine("Error: writefirmwarecmd\n");
+                            return -3;
+                        }
+
+                        //update oft
+                        oft += rlen;
+                        if (oft == fileStream.Length)
+                        {
+                            Console.WriteLine("EOT\n");
+                            ret = 0;
+                            break;
+                        }
+                        else if (oft > fileStream.Length) {
+                            Console.WriteLine("error:oft {0} > {1}\n",oft, fileStream.Length);
+                            ret = -3;
+                            break;
+                        }
+                    }
+                    else {
+                        ret = -4;
+                        break;
+                    }
+                }
+
+                fileStream.Close();
+                return ret;
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine($"Exception: {e.Message}");
+            }
+            return -1;
         }
 
         private static string PrintByteArray(byte[] array)
@@ -390,6 +540,24 @@ namespace UsbLibConsole
             return wCRC;
         }
 
+        public static ushort CRC16(byte[] data, int oft,int length)
+        {
+            ushort wCRC = 0xffff;
+            for (int i = oft; i < length + oft; ++i)
+            {
+                wCRC = (ushort)(wCRC ^ (data[i] << 8));
+
+                for (int j = 0; j < 8; j++)
+                {
+                    if ((wCRC & 0x8000) != 0)
+                        wCRC = (ushort)((wCRC << 1) ^ 0x1021);
+                    else
+                        wCRC <<= 1;
+                }
+            }
+            return wCRC;
+        }
+
         //append stx lenhth and calc crc16
         private static byte[] packetdata(byte cmdid,byte[] data)
         {
@@ -409,8 +577,9 @@ namespace UsbLibConsole
 
         static void Main(string[] args)
         {
-            UsbDriverTest("CY20BootLoaderv0.2.1.bin");
-
+            //UsbDriverTest("CY21BootLoaderv0.2.1.bin");
+            UsbDriverTest("test.bin");
+            //downloadFile("test.bin");
             Console.ReadLine();
         }
     }
