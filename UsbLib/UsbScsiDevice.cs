@@ -210,10 +210,12 @@ namespace UsbLib
         }
 
         /*send 2a with all zero data and get response data*/
-        private bool ExecuteNullCommand()
+        public bool ExecuteNullCommand()
         {
-            byte[] zerodata = new byte[] { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+            byte[] zerodata = new byte[256]; //{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
             byte[] buf = this.Write10.Sptw.GetDataBuffer();
+
+            Array.Copy(MH1903Header, 0, zerodata, 0, MH1903HeaderLen);
             Array.Copy(zerodata, 0, buf, 0, zerodata.Length);
             //1.send cmd and data
             if (!this.Execute(ScsiCommandCode.Write10))
@@ -230,8 +232,9 @@ namespace UsbLib
             }
             byte[] recdata = this.Read10.Sptw.GetDataBuffer();
 
-            if (!CheckByteArrayEquals(recdata, MH1903HeaderLen, zerodata, 0, zerodata.Length))
+            if (!CheckByteArrayEquals(recdata, 0, zerodata, 0, zerodata.Length))
             {
+                Console.WriteLine("Error: reclen:{0}", recdata.Length);
                 return false;
             }
             return true;
@@ -299,6 +302,10 @@ namespace UsbLib
         /* write cmd and read ack*/
         public bool Write(byte[] data, UInt32 datalen)
         {
+            /*if (!ExecuteNullCommand()) {
+                Console.WriteLine("Error: ExecuteNullCommand\n");
+                return false;
+            }*/
             var buf = this.Write10.Sptw.GetDataBuffer();
 
             Array.Copy(data, 0, buf, 0, datalen);
@@ -336,7 +343,15 @@ namespace UsbLib
 
         public bool Write(byte[] data, UInt32 datalen, UInt32 timeout)
         {
+            if (!ExecuteNullCommand())
+            {
+                Console.WriteLine("Error : ExecuteNullCommand");
+                //return false;
+            }
+
             var buf = this.Write10.Sptw.GetDataBuffer();
+
+            this.Write10.SetBounds(0x040000, 1);
 
             Array.Copy(data, 0, buf, 0, datalen);
             if (!this.Execute(ScsiCommandCode.Write10))
@@ -357,11 +372,20 @@ namespace UsbLib
                 //Console.WriteLine("read response length {0}", reslen);
                 if (!CheckByteArrayEquals(recdata, 16, new byte[] { 0x02, 0x80, 0x03, 0, 0x28, 0, 0, 0xB8, 0x84 }, 0, 9))
                 {
+                    
                     for (int ch = 0; ch < 8; ch++)
                     {
                         Console.Write("{0:X}", recdata[16 + ch]);
                     }
-                    Console.Write("\n");
+                    
+                    if (recdata[0] == 0x02)
+                    {
+                        if (recdata[1] == 0x80 || recdata[1] == 0x81 || recdata[1] == 0x82 || recdata[1] == 0x83)
+                        {
+                            Console.Write("\n get response\n");
+                        }
+                    }
+                    Console.Write(" ");
                 }
                 else
                 {
@@ -398,6 +422,46 @@ namespace UsbLib
             Array.Copy(recdata, 16, response, 0,reslen + 4 + 2);
             return true;
         }
+        //write data to 0x08000000 ~ 0x08020000  //128K
+        public bool Write(byte[] data, Int32 address)
+        {
+            UInt32 offset = 0;
+            UInt32 addr = (UInt32)address;
+            UInt32 blksize = 512;
+            
+            {
+                while (offset < data.Length)
+                {
+                    var buf = this.Write10.Sptw.GetDataBuffer();
+                    if (offset + blksize < data.Length)
+                    {
+                        Array.Copy(data, offset, buf, 0, blksize);
+                    }
+                    else
+                    {
+                        /*for(int i = 0;i<blksize;i++)
+                        {
+                            data[i] = 0;
+                        }*/
+                        byte[] zero = new byte[blksize];
+                        Array.Copy(zero, 0, buf, data.Length - offset,  blksize - (data.Length - offset) );
+                    }
+                    this.Write10.SetBounds(addr, 1);
+                    PrintBuffer(this.Write10.Sptw.sptBuffered.Spt.Cdb, 0,10);
+                    
+                    if (!this.Execute(ScsiCommandCode.Write10))
+                    {
+                        Console.WriteLine("Error Ioctl: 0x{0:X8}", this.usb.GetError());
+                        return false;
+                    }
+                    addr += blksize/512;
+                    offset += blksize;
+
+                    Console.WriteLine("write 0x{0:X} bytes to 0x{1:X}\n", offset, addr);
+                }
+            }
+            return true;
+        }
 
         private void PrintData(UInt32 lba, UInt32 sectors, byte[] data)
         {
@@ -420,6 +484,19 @@ namespace UsbLib
                     Console.Write(isTextNumber ? code : '.');
                 }
             }
+        }
+
+        static void PrintBuffer(byte[] buf, int start, int count)
+        {
+            for (int i = start; i < count; i++)
+            {
+                if ((i % 16) == 0)
+                    Console.WriteLine("");
+
+                Console.Write(string.Format("{0:X2} ", buf[i]));
+            }
+
+
         }
     }
 }

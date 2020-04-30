@@ -27,6 +27,7 @@ namespace UsbLib.Scsi
             this.Commands.Add(ScsiCommandCode.Read10, new Read10());
             this.Commands.Add(ScsiCommandCode.Inquiry, new Inquiry());
             this.Commands.Add(ScsiCommandCode.Write10, new Write10());
+            this.Commands.Add(ScsiCommandCode.TestUnitReady, new Write10());
         }
 
         public ScsiCommand this[ScsiCommandCode code]

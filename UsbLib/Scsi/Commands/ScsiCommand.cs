@@ -8,6 +8,7 @@ namespace UsbLib.Scsi.Commands
 {
     public enum ScsiCommandCode : byte
     {
+        TestUnitReady = 0x00,
         Inquiry = 0x12,
         ReadCapacity = 0x25,
         Read10 = 0x28,

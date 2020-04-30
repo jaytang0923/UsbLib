@@ -11,12 +11,13 @@ namespace UsbLib.Scsi.Commands
         public void SetBounds(UInt32 lba, UInt32 sectors)
         {
             var lbaBytes = BitConverter.GetBytes(lba).Reverse<byte>().ToArray();
-            var sectorsBytes = BitConverter.GetBytes(sectors).Reverse<byte>().ToArray();
+            ushort blocksize = 256;
+            var sectorsBytes = BitConverter.GetBytes(blocksize).Reverse<byte>().ToArray();
 
             this.Sptw.SetCdb(lbaBytes, 0, 2, 4);
-            this.Sptw.SetCdb(sectorsBytes, 2, 7, 2);
+            this.Sptw.SetCdb(sectorsBytes, 0, 8, 1);
 
-            this.Sptw.SetDataLength((uint)(sectors * 512));
+            this.Sptw.SetDataLength((uint)(512));
         }
 
         public Write10() :
