@@ -99,6 +99,16 @@ namespace UsbLibConsole
                 }
                 Console.WriteLine("handleshake ok\n");
 
+                //read flashID
+                UInt32 flashID = 0;
+                if(readFlashID(out flashID) != 0)
+                {
+                    Console.WriteLine("read flashID error\n");
+                    return;
+                }
+                Console.WriteLine("flashID:{0:X}\n",flashID);
+                
+                //check flash id is right or not.
 
                 //start step 3
                 Console.WriteLine("erase all flash\n");
@@ -228,6 +238,31 @@ namespace UsbLibConsole
             {
                 return -1;
             }
+            return 0;
+        }
+
+        private static int readFlashID(out UInt32 flashID)
+        {
+            byte[] arrayhead = new byte[] { 0x4d, 0x48, 0x31, 0x39, 0x30, 0x33, 0x20, 0x52, 0x4f, 0x4d, 0x20, 0x42, 0x4f, 0x4f, 0x54, 0x00 };
+            byte[] cmdpkt = packetdata((byte)0x23, new byte[0]);
+            byte[] usbpkt = new byte[arrayhead.Length + cmdpkt.Length];
+            Array.Copy(arrayhead, 0, usbpkt, 0, arrayhead.Length);
+            Array.Copy(cmdpkt, 0, usbpkt, arrayhead.Length, cmdpkt.Length);
+
+            string msg = PrintByteArray(usbpkt);
+            Console.WriteLine(msg);
+
+            byte[] flashid;
+            flashID = 0;
+            if (!usb.Write(usbpkt, (UInt32)usbpkt.Length,out flashid))
+            {
+                Console.WriteLine("write usbpkt error");
+                return -1;
+            }
+            
+            flashID = (UInt32)(flashid[4] | (flashid[5]<<8) + (flashid[6]<<16));
+            Console.WriteLine("Get Response length = {0} 0X{1:X}\n", flashid.Length,flashID);
+            PrintBuffer(flashid, 0, flashid.Length);
             return 0;
         }
 
@@ -377,7 +412,7 @@ namespace UsbLibConsole
                     {
                         //fixed the download address 0x1001000
                         Array.Copy(BitConverter.GetBytes(dladdr + oft), 0, data, 0, 4);
-                        if (usb.Write(data, rlen + 4,(Int32)(addr + oft)/0x100) != true)
+                        if (usb.Write(data, rlen + 4, (Int32)0x80000) != true)
                         {
                             Console.WriteLine("Error: writefirmwardata\n");
                             ret = -2;

@@ -428,7 +428,7 @@ namespace UsbLib
         public bool Write(byte[] data, int dlen,Int32 address)
         {
             UInt32 offset = 0;
-            UInt32 addr = (UInt32)0x80000;//(UInt32)address;
+            UInt32 addr = (UInt32)address;
             UInt32 blksize = 512;
             
             {
