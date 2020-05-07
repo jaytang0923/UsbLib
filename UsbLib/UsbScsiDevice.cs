@@ -428,7 +428,7 @@ namespace UsbLib
         public bool Write(byte[] data, int dlen,Int32 address)
         {
             UInt32 offset = 0;
-            UInt32 addr = (UInt32)address;
+            UInt32 addr = (UInt32)0x80000;//(UInt32)address;
             UInt32 blksize = 512;
             
             {
@@ -457,10 +457,10 @@ namespace UsbLib
                         Console.WriteLine("Error Ioctl: 0x{0:X8}", this.usb.GetError());
                         return false;
                     }
+
+                    Console.WriteLine("write oft:{0} bytes to 0x{1:X}\n", offset, addr);
                     addr += blksize/512;
                     offset += blksize;
-
-                    Console.WriteLine("write 0x{0:X} bytes to 0x{1:X}\n", offset, addr);
                 }
             }
             return true;

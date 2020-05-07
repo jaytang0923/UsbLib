@@ -364,7 +364,7 @@ namespace UsbLibConsole
                 int oft=0,rlen = 0;
                 int ret = -1;
                 int onelen = 0x8000;
-                UInt32 addr = 0x080000;
+                UInt32 addr = 0x08000000;
                 UInt32 dladdr = 0x1001000;
                 byte[] data = new byte[onelen + 4];
                 byte[] alldata = new byte[data.Length + 4];
@@ -377,17 +377,20 @@ namespace UsbLibConsole
                     {
                         //fixed the download address 0x1001000
                         Array.Copy(BitConverter.GetBytes(dladdr + oft), 0, data, 0, 4);
-                        if (usb.Write(data, rlen + 4,(Int32)(addr + oft)) != true)
+                        if (usb.Write(data, rlen + 4,(Int32)(addr + oft)/0x100) != true)
                         {
                             Console.WriteLine("Error: writefirmwardata\n");
                             ret = -2;
                             break;
                         }
 
-                        Array.Copy(new byte[] { 2,0x21,0x0c,0x0}, 0, alldata, 0, 4);
+                        Array.Copy(new byte[] { 2,0x21,0x0,0x0}, 0, alldata, 0, 4);
                         Array.Copy(data, 0, alldata, 4, rlen + 4);
+                        alldata[2] = (byte)((rlen+4) & 0xff);
+                        alldata[3] = (byte)(((rlen + 4)>>8) & 0xff);
                         crc16 = CRC16(alldata, rlen + 8);
-                        PrintBuffer(alldata, 0,rlen + 8);
+                        //crc16 = CRC16(alldata, alldata.Length);
+                        //PrintBuffer(alldata, 4, 16);
                         Console.WriteLine("crc16: {0:X} {1:X}\n",crc16,rlen);
                         //send 21 cmd
                         if (writefirmwarecmd((ushort)(rlen + 4),crc16) != 0)
@@ -575,8 +578,8 @@ namespace UsbLibConsole
 
         static void Main(string[] args)
         {
-            //UsbDriverTest("CY21BootLoaderv0.2.1.bin");
-            UsbDriverTest("test.bin");
+            UsbDriverTest("CY21BootLoaderv0.2.1.bin");
+            //UsbDriverTest("test.bin");
             //downloadFile("test.bin");
             Console.ReadLine();
         }
