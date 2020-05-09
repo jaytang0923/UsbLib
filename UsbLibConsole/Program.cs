@@ -107,8 +107,17 @@ namespace UsbLibConsole
                     return;
                 }
                 Console.WriteLine("flashID:{0:X}\n",flashID);
-                
+
                 //check flash id is right or not.
+
+                //write flash otp paras
+                if (writeFlashParas(flashID) != 0)
+                {
+                    Console.WriteLine("writeFlashParas error\n");
+                    return;
+                }
+                Console.WriteLine("writeFlashParas ok\n");
+                return;
 
                 //start step 3
                 Console.WriteLine("erase all flash\n");
@@ -263,6 +272,54 @@ namespace UsbLibConsole
             flashID = (UInt32)(flashid[4] | (flashid[5]<<8) + (flashid[6]<<16));
             Console.WriteLine("Get Response length = {0} 0X{1:X}\n", flashid.Length,flashID);
             PrintBuffer(flashid, 0, flashid.Length);
+            return 0;
+        }
+
+        private static int writeFlashParas(UInt32 flashID)
+        {
+            UInt32[] flashID_support = new UInt32[] {
+                0x684017
+            };
+            UInt32[,] flashID_support_paras = new UInt32[2,9]{
+                { 0,0x309F,0x27031,0x404277,0xD132,0x9020,0xC7,0xAB,0xb2EB},
+                { 0,2,3,4,5,6,7,8,9}
+            };
+            int idx = -1;
+            for(int i = 0;i< flashID_support.Length; i++)
+            {
+                if( flashID == flashID_support[i])
+                {
+                    idx = i;
+                    break;
+                }
+            }
+
+            if(idx < 0)
+            {
+                Console.WriteLine("Error:unsupport flash id\n");
+                return -1;
+            }
+            Console.WriteLine("idx = {0} ", idx);
+            UInt32[] paras = new UInt32[9];
+            byte[] cmddata = new byte[36];
+            for(int i = 0; i < 9; i++)
+            {
+                paras[i] = flashID_support_paras[idx,i];
+                //Console.WriteLine("{0:X} ", paras[i]);
+            }
+
+            for(int i=0;i<paras.Length;i++)
+            {
+                Array.Copy(BitConverter.GetBytes(paras[i]),0,cmddata,i*4,4);
+            }
+
+            PrintBuffer(cmddata,0,cmddata.Length);
+            
+            if (executecmd((byte)0x18, cmddata) != 0)
+            {
+                Console.WriteLine("Error: wrtie flash paras to flash");
+                return -2;
+            }
             return 0;
         }
 

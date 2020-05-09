@@ -329,9 +329,17 @@ namespace UsbLib
                 Console.WriteLine("read response length {0}",reslen);
                 if (!CheckByteArrayEquals(recdata, 16, new byte[] { 0x02, 0x80, 0x03, 0 ,0x28,0,0,0xB8,0x84}, 0, 9))
                 {
-                    for (int ch = 0; ch < 8; ch++)
+                    for (int ch = 0; ch < reslen + 4; ch++)
                     {
-                        Console.Write("{0:X}", recdata[16 + ch]);
+                        Console.Write("{0:X2} ", recdata[16 + ch]);
+                        if (ch > 9) break;
+                    }
+                    Console.Write("\n");
+
+                    if (CheckByteArrayEquals(recdata, 16, new byte[] { 0x02, 0x80, 0x03, 0, 0x29}, 0, 5))
+                    {
+                        Console.Write("Get NACK\n");
+                        return false;
                     }
                 }
                 else {
