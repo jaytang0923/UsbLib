@@ -515,6 +515,17 @@ namespace UsbLib
     public class USBDownLoad
     {
         static UsbScsiDevice usb;
+        private static string currentStausmsg = "测试";
+        public string getStatus()
+        {
+            return currentStausmsg;
+        }
+
+        static void setStatus(string msg)
+        {
+            currentStausmsg = msg;
+            Console.WriteLine(msg);
+        }
 
         static void PrintBuffer(byte[] buf, int start, int count)
         {
@@ -529,7 +540,7 @@ namespace UsbLib
 
         }
 
-        public void USBDownloadFile(String filename, String usbdisk)
+        public int USBDownloadFile(String filename, String usbdisk)
         {
 
             try
@@ -539,8 +550,9 @@ namespace UsbLib
                 {
                     byte[] data = new byte[1024];
                     usb.Write(data, (Int32)0x08000000);
-                    return;
+                    return -11;
                 }
+                setStatus("连接MCU");
                 Console.WriteLine($"Connect device: {usb.Connect(usbdisk)}");
 
                 Console.WriteLine("start read Inquiry");
@@ -574,7 +586,7 @@ namespace UsbLib
                 byte[] fwheader = usb.Read();
                 if (fwheader.Length == 0)
                 {
-                    return;
+                    return -1;
                 }
                 Console.WriteLine("Get Info Success:\n");
                 PrintBuffer(fwheader, 0, fwheader.Length);
@@ -584,45 +596,49 @@ namespace UsbLib
                 byte[] response0;
                 if (!usb.Write(array00, 16, out response0))
                 {
-                    return;
+                    return -2;
                 }
                 Console.WriteLine("Get Response00 length = {0}\n", response0.Length);
                 PrintBuffer(response0, 0, response0.Length);
 
+                setStatus("开始握手");
                 //MH1903 Step 2,write 30
                 if (handleshake() != 0)
                 {
                     Console.WriteLine("handleshake error\n");
-                    return;
+                    return -3;
                 }
                 Console.WriteLine("handleshake ok\n");
 
                 //read flashID
+                setStatus("读取FlashID");
                 UInt32 flashID = 0;
                 if (readFlashID(out flashID) != 0)
                 {
                     Console.WriteLine("read flashID error\n");
-                    return;
+                    return -4;
                 }
                 Console.WriteLine("flashID:{0:X}\n", flashID);
 
                 //check flash id is right or not.
 
                 //write flash otp paras
+                setStatus("写入Flash参数至OTP");
                 if (writeFlashParas(flashID) != 0)
                 {
                     Console.WriteLine("writeFlashParas error\n");
-                    return;
+                    return -5;
                 }
                 Console.WriteLine("writeFlashParas ok\n");
                 //return;
 
                 //start step 3
+                setStatus("格式化擦除Flash");
                 Console.WriteLine("erase all flash\n");
                 if (writefirmwarehead(filename) != 0)
                 {
                     Console.WriteLine("writefirmwarehead error\n");
-                    return;
+                    return -6;
                 }
                 Console.WriteLine("writefirmwarehead OK\n");
 
@@ -631,25 +647,31 @@ namespace UsbLib
                 if (eraseflash() != 0)
                 {
                     Console.WriteLine("erase all flash error\n");
-                    return;
+                    return -7;
                 }
                 Console.WriteLine("erase all flash OK\n");
 
                 //step4 download files
+                setStatus("开始下载");
                 Console.WriteLine("downloadFile\n");
-                if (downloadFile(filename) != 0)
+                int ret = downloadFile(filename);
+                if ( ret != 0)
                 {
                     Console.WriteLine("downloadFile error\n");
-                    return;
+                    setStatus(String.Format("下载失败,code={0}",ret));
+                    return -8;
                 }
                 Console.WriteLine("downloadFile OK\n");
-
+                setStatus("下载完毕!");
             }
             catch (Exception e)
             {
                 Console.WriteLine($"Exception: {e.Message}");
                 usb.Disconnect();
+                return -9;
             }
+            
+            return 0;
         }
 
         private static byte[] Int32ToBytes(uint number)
@@ -959,6 +981,7 @@ namespace UsbLib
                 byte[] data = new byte[onelen + 4];
                 byte[] alldata = new byte[data.Length + 4];
                 ushort crc16;
+                long filesize = GetFileSize(filename);
 
                 while (true)
                 {
@@ -994,6 +1017,7 @@ namespace UsbLib
                         if (oft == fileStream.Length)
                         {
                             Console.WriteLine("EOT\n");
+                            setStatus("下载进度:100%");
                             ret = 0;
                             break;
                         }
@@ -1002,6 +1026,9 @@ namespace UsbLib
                             Console.WriteLine("error:oft {0} > {1}\n", oft, fileStream.Length);
                             ret = -3;
                             break;
+                        }
+                        else {
+                            setStatus(String.Format("下载进度:{0}%",oft*100/ filesize));
                         }
                     }
                     else
