@@ -670,9 +670,11 @@ namespace UsbLibConsole
 
         static void Main(string[] args)
         {
-            UsbDriverTest("CY21BootLoaderv0.2.1.bin");
+            //UsbDriverTest("CY21BootLoaderv0.2.1.bin");
             //UsbDriverTest("test.bin");
             //downloadFile("test.bin");
+            USBDownLoad usbdl = new USBDownLoad();
+            usbdl.USBDownloadFile("CY21BootLoaderv0.2.1.bin", "H");
             Console.ReadLine();
         }
     }
