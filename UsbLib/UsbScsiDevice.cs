@@ -621,7 +621,7 @@ namespace UsbLib
                 Console.WriteLine("flashID:{0:X}\n", flashID);
 
                 //check flash id is right or not.
-
+/*
                 //write flash otp paras
                 setStatus("写入Flash参数至OTP");
                 if (writeFlashParas(flashID) != 0)
@@ -630,7 +630,7 @@ namespace UsbLib
                     return -5;
                 }
                 Console.WriteLine("writeFlashParas ok\n");
-                //return;
+*/
 
                 //start step 3
                 setStatus("格式化擦除Flash");
