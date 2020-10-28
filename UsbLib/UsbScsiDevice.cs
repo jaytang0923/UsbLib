@@ -459,7 +459,7 @@ namespace UsbLib
                         Array.Copy(zero, 0, buf, dlen - offset,  blksize - (dlen - offset) );
                     }
                     this.Write10.SetBounds(addr, 1);
-                    PrintBuffer(this.Write10.Sptw.sptBuffered.Spt.Cdb, 0,10);
+                    //PrintBuffer(this.Write10.Sptw.sptBuffered.Spt.Cdb, 0,10);
                     
                     if (!this.Execute(ScsiCommandCode.Write10))
                     {
@@ -467,7 +467,7 @@ namespace UsbLib
                         return false;
                     }
 
-                    Console.WriteLine("write oft:{0} bytes to 0x{1:X}\n", offset, addr);
+                    //Console.WriteLine("write oft:{0} bytes to 0x{1:X}\n", offset, addr);
                     addr += blksize/512;
                     offset += blksize;
                 }
@@ -516,6 +516,7 @@ namespace UsbLib
     {
         static UsbScsiDevice usb;
         private static string currentStausmsg = "测试";
+        private static long s_filesize = 0; //the bootloader size
         public string getStatus()
         {
             return currentStausmsg;
@@ -633,8 +634,6 @@ namespace UsbLib
 */
 
                 //start step 3
-                setStatus("格式化擦除Flash");
-                Console.WriteLine("erase all flash\n");
                 if (writefirmwarehead(filename) != 0)
                 {
                     Console.WriteLine("writefirmwarehead error\n");
@@ -643,13 +642,13 @@ namespace UsbLib
                 Console.WriteLine("writefirmwarehead OK\n");
 
                 //step 4 erase flash
-                Console.WriteLine("erase all flash\n");
-                if (eraseflash() != 0)
+                Console.WriteLine("erase flash\n");
+                if (eraseflash(false) != 0)
                 {
-                    Console.WriteLine("erase all flash error\n");
+                    Console.WriteLine("erase flash error\n");
                     return -7;
                 }
-                Console.WriteLine("erase all flash OK\n");
+                Console.WriteLine("erase flash OK\n");
 
                 //step4 download files
                 setStatus("开始下载");
@@ -864,6 +863,7 @@ namespace UsbLib
                 Console.WriteLine("error:file size is %d\n", filesize);
                 return -2;
             }
+            s_filesize = filesize;
             fmheadarray[oft] = (byte)(filesize & 0xff);
             fmheadarray[oft + 1] = (byte)(filesize >> 8 & 0xff);
             fmheadarray[oft + 2] = (byte)(filesize >> 16 & 0xff);
@@ -915,17 +915,50 @@ namespace UsbLib
             return 0;
         }
 
-        private static int eraseflash()
+        private static int eraseflash(bool eraseall)
         {
-            /*if (eraseflash((UInt32)0x1000000, (UInt32)1, 260) != 0)
+            if(eraseall == true)
             {
-                Console.WriteLine("erase flash 1 error\n");
-                return -1;
-            }*/
+                Console.WriteLine("erase all");
+                if (eraseflash((UInt32)0x1000000, (UInt32)0xFFFFFFFF, 20000) != 0)
+                {
+                    Console.WriteLine("erase all flash error\n");
+                    return -1;
+                }
 
-            if (eraseflash((UInt32)0x1000000, (UInt32)0xFFFFFFFF, 20000) != 0)
+                //clean data area
+                if (!usb.ExecuteNullCommand())
+                {
+                    Console.WriteLine("Error:ExecuteNullCommand!\n");
+                    return -3;
+                }
+                return 0;
+            }
+
+            int secs = (int)(s_filesize/0x1000);
+            if((s_filesize % 0x1000) != 0)
             {
-                Console.WriteLine("erase all flash error\n");
+                secs += 1;
+            }
+            Console.WriteLine("erase flash from 0x1001000 to {0:X8}" , 0x1001000 + secs*0x1000);
+
+            //erase first block
+            if (eraseflash((UInt32)0x1000000, (UInt32)1, 260) != 0)
+            {
+                Console.WriteLine("erase flash 0x1000000 error\n");
+                return -1;
+            }
+            //clean data area
+            if (!usb.ExecuteNullCommand())
+            {
+                Console.WriteLine("Error:ExecuteNullCommand!\n");
+                return -3;
+            }
+
+            //erase app aera.
+            if (eraseflash((UInt32)0x1001000, (UInt32)secs, 20000) != 0)
+            {
+                Console.WriteLine("erase flash error\n");
                 return -2;
             }
 
@@ -935,6 +968,78 @@ namespace UsbLib
                 Console.WriteLine("Error:ExecuteNullCommand!\n");
                 return -3;
             }
+            return 0;
+        }
+
+        public int injectRSApublickey(byte[]rsakeyn)
+        {
+            Console.WriteLine("injectRSApublickey");
+            byte[] rsapkg = new byte[324];
+            int oft = 0;
+
+            //format rsapkg to all 0
+            for (int i = 0; i < rsapkg.Length; i++)
+            {
+                rsapkg[i] = 0;
+            }
+
+            //SN
+            byte[] sn = new byte[16]{ 0x10,0x80,0x80,0x80, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+            Random ra = new Random(unchecked((int)DateTime.Now.Ticks));
+            for (int i=0;i<8;i++)
+            {
+                sn[i + 4] = (byte)(ra.Next(0, 256)&0xff);
+            }
+            Array.Copy(sn, 0, rsapkg, 0, sn.Length);
+            oft += 16;
+
+            //Timeout 100
+            rsapkg[oft] = 0x64;
+            rsapkg[oft+1] = 0x00;
+            oft += 2;
+
+            //Res 0x0000
+            oft += 2;
+
+            //KeyIdx 1
+            rsapkg[oft] = 0x01;
+            oft += 4;
+
+            //E 0x010001
+            rsapkg[oft] = 0x00;
+            rsapkg[oft + 1] = 0x00;
+            rsapkg[oft + 2] = 0x00;
+            rsapkg[oft + 3] = 0x00;
+            rsapkg[oft + 4] = 0x00;
+            rsapkg[oft + 5] = 0x01;
+            rsapkg[oft + 6] = 0x00;
+            rsapkg[oft + 7] = 0x01;
+            oft += 8;
+
+            //N 
+            Array.Copy(rsakeyn,0,rsapkg,oft,256);
+            oft += 256;
+
+            /*IsEncrypt  
+             * none 0x5555 : enable flash enc
+             * 0xAAAA: use input key else use random aes key.
+             * 
+            */
+            oft += 4;
+
+            //aesKey ,all 0
+            //aesIV ,all 0
+
+            //execute inject cmd
+            PrintBuffer(rsapkg, 0, rsapkg.Length);
+            return 0;
+
+            if (executecmd((byte)0x12, rsapkg) != 0)
+            {
+                Console.WriteLine("Error: inject RSA key");
+                return -1;
+            }
+            Console.WriteLine("inject RSA key success.");
             return 0;
         }
 
