@@ -668,13 +668,26 @@ namespace UsbLibConsole
             return frame;
         }
 
+        public static byte[] StringToByteArray(string hex)
+        {
+            return Enumerable.Range(0, hex.Length)
+                             .Where(x => x % 2 == 0)
+                             .Select(x => Convert.ToByte(hex.Substring(x, 2), 16))
+                             .ToArray();
+        }
+
         static void Main(string[] args)
         {
             //UsbDriverTest("CY21BootLoaderv0.2.1.bin");
             //UsbDriverTest("test.bin");
             //downloadFile("test.bin");
             USBDownLoad usbdl = new USBDownLoad();
-            usbdl.USBDownloadFile("CY21BootLoaderv0.2.1.bin", "H");
+            //usbdl.USBDownloadFile("CY20BootLoaderv0.2.6.bin", "H");
+            usbdl.USBDownloadFile("CY20BootLoaderv0.2.6.sig", "H");
+            string strrsa = "CA9CB139002106582CD4593215C8CED6C9DDEDC2F2825A00EDA7D69C128B12C31DC1F79DBBFFB49BF8ED0335BCE12A96590BBC164A5782B6E8EE268F0028962AD0598FAD5D83A9967EEAD6B2A36A3E4E0A186F73A007C689092E8E5A0BC112EE8F8AB0145CB6628C025DF5509FF92E848886F5E9B7AB3C01C971213A702EF56097A3D5792A3DBC4421A1199CF237FB924FB8179BBEFF4249A74060F54E841A3E3A48CB7CEF4B8774A5CC43163FE907252D425877F0208B91F8C4D6AA31986F882621B76D4AE8E50D52BDD5781D9A5C9A0F16429A1DFB7F759E1DA459AD357E9503DC83D99AC75AFE30357A42CF03E0455C039FF7FB23B233F5ADCECEC12F1A65";
+            byte[] rsakey = StringToByteArray(strrsa);
+
+            //usbdl.injectRSApublickey(rsakey);
             Console.ReadLine();
         }
     }

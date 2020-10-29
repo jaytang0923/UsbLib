@@ -517,6 +517,9 @@ namespace UsbLib
         static UsbScsiDevice usb;
         private static string currentStausmsg = "测试";
         private static long s_filesize = 0; //the bootloader size
+        private static bool s_filetypeSIG = true;
+        private static bool s_securephase = true;
+
         public string getStatus()
         {
             return currentStausmsg;
@@ -541,11 +544,38 @@ namespace UsbLib
 
         }
 
+        private int Getfileinfo(string filename)
+        {
+            string strExt = System.IO.Path.GetExtension(filename);
+            s_filesize = GetFileSize(filename);
+
+            if (string.Compare(strExt, ".sig") == 0)
+            {
+                s_filetypeSIG = true;
+            }
+            else if (string.Compare(strExt, ".bin") == 0)
+            {
+                s_filetypeSIG = false;
+            }
+            else
+            {
+                return -1;
+            }
+
+            return 0;
+        }
+
         public int USBDownloadFile(String filename, String usbdisk)
         {
 
             try
             {
+                if (this.Getfileinfo(filename) != 0)
+                {
+                    Console.WriteLine("getfileinfo error");
+                    return -1;
+                }
+
                 usb = new UsbScsiDevice();
                 if (false)
                 {
@@ -553,6 +583,7 @@ namespace UsbLib
                     usb.Write(data, (Int32)0x08000000);
                     return -11;
                 }
+
                 setStatus("连接MCU");
                 Console.WriteLine($"Connect device: {usb.Connect(usbdisk)}");
 
@@ -843,6 +874,39 @@ namespace UsbLib
 
         private static int writefirmwarehead(string filename)
         {
+            // read sig data if need
+            try
+            {
+                if (s_filetypeSIG)
+                {
+                    byte[] sighead = new byte[0x104];
+                    sighead[0] = sighead[1] = 0xAA;
+                    sighead[2] = sighead[3] = 0x55;
+
+                    System.IO.FileStream fileStream = System.IO.File.OpenRead(filename);
+                    if(fileStream.Read(sighead, 4, 0x34) != 0x34)
+                    {
+                        Console.WriteLine("Error: read sig file\n");
+                        return -1;
+                    }
+                    if (fileStream.Read(sighead, 4, 0x100) != 0x100)
+                    {
+                        Console.WriteLine("Error: read sig file\n");
+                        return -1;
+                    }
+                    if (executecmd((byte)0x20, sighead) != 0)
+                    {
+                        Console.WriteLine("Error: executecmd 0x20 cmd\n");
+                        return -1;
+                    }
+                    return 0;
+                }
+            }
+            catch (Exception)
+            {
+                return -1;
+            }
+
             Console.WriteLine("Start step 3,send firmware head\n");
             byte[] fmheadarray = new byte[92];
             //add fixed head
@@ -1086,10 +1150,29 @@ namespace UsbLib
                 byte[] data = new byte[onelen + 4];
                 byte[] alldata = new byte[data.Length + 4];
                 ushort crc16;
-                long filesize = GetFileSize(filename);
+                int filesize = (int)s_filesize;
 
+                if(s_filetypeSIG == true)
+                {
+                    Console.WriteLine("download sig file\n");
+                    filesize -= 0x138;
+                    //drop fist 0x134 bytes
+                    rlen = fileStream.Read(data, 0, 0x134);
+                    if(rlen != 0x134)
+                    {
+                        Console.WriteLine("Error: read sig file\n");
+                        return -1;
+                    }
+                }
+                
                 while (true)
                 {
+                    if(oft+onelen > filesize)
+                    {
+                        // last packet
+                        onelen = filesize - oft;
+                        Console.WriteLine("last packet {0}bytes", onelen);
+                    }
                     rlen = fileStream.Read(data, 4, onelen);
                     if (rlen > 0)
                     {
@@ -1119,16 +1202,16 @@ namespace UsbLib
 
                         //update oft
                         oft += rlen;
-                        if (oft == fileStream.Length)
+                        if (oft == filesize)
                         {
                             Console.WriteLine("EOT\n");
                             setStatus("下载进度:100%");
                             ret = 0;
                             break;
                         }
-                        else if (oft > fileStream.Length)
+                        else if (oft > filesize)
                         {
-                            Console.WriteLine("error:oft {0} > {1}\n", oft, fileStream.Length);
+                            Console.WriteLine("error:oft {0} > {1}\n", oft, filesize);
                             ret = -3;
                             break;
                         }
