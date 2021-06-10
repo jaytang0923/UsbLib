@@ -11,6 +11,7 @@ namespace UsbLib
     using UsbLib.Scsi.Commands;
     using System.IO;
 
+
     /// <summary>
     /// Scsi device class on base Usb Bulk protocol
     /// </summary>
@@ -52,9 +53,9 @@ namespace UsbLib
         public byte[] Read(UInt32 lba, UInt32 sectors)
         {
             byte[] data = new byte[sectors * 512];
-            
+
             UInt32 offset = 0;
-            
+
             while (sectors > 0)
             {
                 UInt32 transferSectorLength = (sectors >= 64) ? 64 : sectors;
@@ -79,8 +80,9 @@ namespace UsbLib
         }
 
         /*read response */
-        public byte[] Read() {
-            byte []response = new byte[] { };
+        public byte[] Read()
+        {
+            byte[] response = new byte[] { };
             if (!this.Execute(ScsiCommandCode.Read10))
             {
                 Console.WriteLine("Error Ioctl: 0x{0:X8}", this.usb.GetError());
@@ -90,7 +92,8 @@ namespace UsbLib
             int reslen = BitConverter.ToUInt16(recdata, 16 + 2);
             Console.WriteLine("read response length {0}", reslen);
 
-            if (!CheckByteArrayEquals(recdata, 0, MH1903Header, 0, MH1903Header.Length)){
+            if (!CheckByteArrayEquals(recdata, 0, MH1903Header, 0, MH1903Header.Length))
+            {
                 Console.WriteLine("Error MH1903 Header: 0x{0:X8}", this.usb.GetError());
                 return response;
             }
@@ -101,7 +104,8 @@ namespace UsbLib
         }
 
         /*check the ack packet*/
-        private bool checkACK(byte[]response) {
+        private bool checkACK(byte[] response)
+        {
             return CheckByteArrayEquals(response, 0, ACKPacket, 0, ACKPacket.Length);
         }
 
@@ -115,7 +119,7 @@ namespace UsbLib
         /*send 0x30 cmd*/
         public bool StartUSBConnect()
         {
-            byte[] cmdpacket = packetCommand(CMD_USBSTART,new byte[] { });
+            byte[] cmdpacket = packetCommand(CMD_USBSTART, new byte[] { });
             byte[] response = ExecuteCommand(cmdpacket);
             return checkACK(response);
         }
@@ -131,7 +135,7 @@ namespace UsbLib
             UInt32 offset = 0;
             var buf = this.Write10.Sptw.GetDataBuffer();
 
-            while(sectors > 0)
+            while (sectors > 0)
             {
                 UInt32 transferSectorLength = (sectors >= 64) ? 64 : sectors;
                 UInt32 transferBytes = transferSectorLength * 512;
@@ -190,7 +194,7 @@ namespace UsbLib
         private const byte SYNC = 0x02;
 
         /*packet cmd and cmddata and calc the crc16*/
-        private byte[] packetCommand(byte cmd,byte[]cmddata)
+        private byte[] packetCommand(byte cmd, byte[] cmddata)
         {
             ushort datalen = (ushort)cmddata.Length;
             byte[] cmdpacket = new byte[datalen + 6];
@@ -199,14 +203,14 @@ namespace UsbLib
             //data length
             Array.Copy(BitConverter.GetBytes(datalen), 0, cmdpacket, 2, 2);
             //data
-            if(datalen > 0)
+            if (datalen > 0)
             {
                 Array.Copy(cmddata, 0, cmdpacket, 4, datalen);
             }
 
             //calc crc16
-            byte[] crc16 = CRC16_C(cmdpacket,4+datalen);
-            Array.Copy(crc16, 0, cmdpacket, 4+datalen, 2);
+            byte[] crc16 = CRC16_C(cmdpacket, 4 + datalen);
+            Array.Copy(crc16, 0, cmdpacket, 4 + datalen, 2);
             return cmdpacket;
         }
 
@@ -244,7 +248,8 @@ namespace UsbLib
         }
 
         /*execute cmd and get response*/
-        public byte[] ExecuteCommand(byte[] cmdpacket) {
+        public byte[] ExecuteCommand(byte[] cmdpacket)
+        {
             byte[] response = new byte[] { };
             //0.send null command for clean cmd area.
             if (!ExecuteNullCommand())
@@ -292,12 +297,12 @@ namespace UsbLib
                 }
                 System.Threading.Thread.Sleep(10);
             }
-            
+
             //check response,SYNC CMD + LEN0 + LEN1 + DATA CRC0 CRC1
-            if(reslen > 0)
+            if (reslen > 0)
             {
                 response = new byte[reslen + 6];
-                Array.Copy(recdata, MH1903HeaderLen,response,0,reslen + 6);
+                Array.Copy(recdata, MH1903HeaderLen, response, 0, reslen + 6);
             }
             return response;
         }
@@ -327,8 +332,8 @@ namespace UsbLib
                 }
                 var recdata = this.Read10.Sptw.GetDataBuffer();
                 int reslen = BitConverter.ToUInt16(recdata, 16 + 2);
-                Console.WriteLine("read response length {0}",reslen);
-                if (!CheckByteArrayEquals(recdata, 16, new byte[] { 0x02, 0x80, 0x03, 0 ,0x28,0,0,0xB8,0x84}, 0, 9))
+                Console.WriteLine("read response length {0}", reslen);
+                if (!CheckByteArrayEquals(recdata, 16, new byte[] { 0x02, 0x80, 0x03, 0, 0x28, 0, 0, 0xB8, 0x84 }, 0, 9))
                 {
                     for (int ch = 0; ch < reslen + 4; ch++)
                     {
@@ -337,13 +342,14 @@ namespace UsbLib
                     }
                     Console.Write("\n");
 
-                    if (CheckByteArrayEquals(recdata, 16, new byte[] { 0x02, 0x80, 0x03, 0, 0x29}, 0, 5))
+                    if (CheckByteArrayEquals(recdata, 16, new byte[] { 0x02, 0x80, 0x03, 0, 0x29 }, 0, 5))
                     {
                         Console.Write("Get NACK\n");
                         return false;
                     }
                 }
-                else {
+                else
+                {
                     Console.WriteLine("WriteCMD Got ACK OK");
                     return true;
                 }
@@ -371,7 +377,7 @@ namespace UsbLib
                 return false;
             }
             //read timeout is 10*10
-            for (int i = 0; i < timeout/10; i++)
+            for (int i = 0; i < timeout / 10; i++)
             {
                 if (!this.Execute(ScsiCommandCode.Read10))
                 {
@@ -383,12 +389,12 @@ namespace UsbLib
                 //Console.WriteLine("read response length {0}", reslen);
                 if (!CheckByteArrayEquals(recdata, 16, new byte[] { 0x02, 0x80, 0x03, 0, 0x28, 0, 0, 0xB8, 0x84 }, 0, 9))
                 {
-                    
+
                     for (int ch = 0; ch < 8; ch++)
                     {
                         Console.Write("{0:X}", recdata[16 + ch]);
                     }
-                    
+
                     if (recdata[0] == 0x02)
                     {
                         if (recdata[1] == 0x80 || recdata[1] == 0x81 || recdata[1] == 0x82 || recdata[1] == 0x83)
@@ -400,7 +406,7 @@ namespace UsbLib
                 }
                 else
                 {
-                    Console.WriteLine("WriteCMD Got ACK OK,take {0}ms\n",i*10);
+                    Console.WriteLine("WriteCMD Got ACK OK,take {0}ms\n", i * 10);
                     return true;
                 }
                 System.Threading.Thread.Sleep(10);
@@ -426,20 +432,20 @@ namespace UsbLib
                 return false;
             }
             var recdata = this.Read10.Sptw.GetDataBuffer();
-            int reslen = BitConverter.ToUInt16(recdata,16 + 2);
+            int reslen = BitConverter.ToUInt16(recdata, 16 + 2);
             Console.WriteLine("read response length {0}", reslen);
 
             response = new byte[reslen + 6];
-            Array.Copy(recdata, 16, response, 0,reslen + 4 + 2);
+            Array.Copy(recdata, 16, response, 0, reslen + 4 + 2);
             return true;
         }
         //write data to 0x08000000 ~ 0x08020000  //128K
-        public bool Write(byte[] data, int dlen,Int32 address)
+        public bool Write(byte[] data, int dlen, Int32 address)
         {
             UInt32 offset = 0;
             UInt32 addr = (UInt32)address;
             UInt32 blksize = 512;
-            
+
             {
                 while (offset < dlen)
                 {
@@ -456,11 +462,11 @@ namespace UsbLib
                         }*/
                         byte[] zero = new byte[blksize];
                         Array.Copy(data, offset, buf, 0, dlen - offset);
-                        Array.Copy(zero, 0, buf, dlen - offset,  blksize - (dlen - offset) );
+                        Array.Copy(zero, 0, buf, dlen - offset, blksize - (dlen - offset));
                     }
                     this.Write10.SetBounds(addr, 1);
                     //PrintBuffer(this.Write10.Sptw.sptBuffered.Spt.Cdb, 0,10);
-                    
+
                     if (!this.Execute(ScsiCommandCode.Write10))
                     {
                         Console.WriteLine("Error Ioctl: 0x{0:X8}", this.usb.GetError());
@@ -468,7 +474,7 @@ namespace UsbLib
                     }
 
                     //Console.WriteLine("write oft:{0} bytes to 0x{1:X}\n", offset, addr);
-                    addr += blksize/512;
+                    addr += blksize / 512;
                     offset += blksize;
                 }
             }
@@ -514,11 +520,18 @@ namespace UsbLib
 
     public class USBDownLoad
     {
+        const byte DeviceStageDebug = 3;
+        const byte DeviceStageRelease = 4;
+
+        const UInt32 FLASHID_BY25Q64AS = 0X684017;
+
         static UsbScsiDevice usb;
         private static string currentStausmsg = "测试";
         private static long s_filesize = 0; //the bootloader size
         private static bool s_filetypeSIG = true;
         private static bool s_securephase = true;
+
+        public byte[] RSAPublicKey = new byte[256]; // n of rsa 2048
 
         public string getStatus()
         {
@@ -533,6 +546,7 @@ namespace UsbLib
 
         static void PrintBuffer(byte[] buf, int start, int count)
         {
+
             for (int i = start; i < count; i++)
             {
                 if ((i % 16) == 0)
@@ -540,7 +554,6 @@ namespace UsbLib
 
                 Console.Write(string.Format("{0:X2} ", buf[i]));
             }
-
 
         }
 
@@ -577,15 +590,12 @@ namespace UsbLib
                 }
 
                 usb = new UsbScsiDevice();
-                if (false)
-                {
-                    byte[] data = new byte[1024];
-                    usb.Write(data, (Int32)0x08000000);
-                    return -11;
-                }
-
                 setStatus("连接MCU");
-                Console.WriteLine($"Connect device: {usb.Connect(usbdisk)}");
+                if (usb.Connect(usbdisk) == false)
+                {
+                    Console.WriteLine($"Connect device: {usb.Connect(usbdisk)}");
+                    return -1;
+                }
 
                 Console.WriteLine("start read Inquiry");
                 if (usb.Execute(ScsiCommandCode.Inquiry))
@@ -598,30 +608,35 @@ namespace UsbLib
                         Console.Write(string.Format("{0:X} ", po[i]));
                 }
                 else
+                {
                     Console.WriteLine($"Bad command: Inquiry");
-                /*
-                if (usb.Execute(ScsiCommandCode.ReadCapacity))
-                {
-                    ReadCapacity rc10 = usb.ReadCapacity;
-                    UInt32 cntSector = rc10.CountSectors();
-                    UInt32 sizeSector = rc10.SizeSector();
-                    Console.WriteLine($"C: {cntSector}, S: {sizeSector}");
-
-                    UInt32 mb = (UInt32)(rc10.Capacity() / (1024 * 1024));
-                    Console.WriteLine($"Sectors: {cntSector} [{mb}] MB");
-                    Console.Write("ReadCapacity10: ");
-                    PrintBuffer(rc10.Sptw.GetDataBuffer(0, 8), 0, 8);
-                }
-                else
-                    Console.WriteLine($"Bad command: {Marshal.GetLastWin32Error()}");
-                */
-                byte[] fwheader = usb.Read();
-                if (fwheader.Length == 0)
-                {
                     return -1;
                 }
-                Console.WriteLine("Get Info Success:\n");
-                PrintBuffer(fwheader, 0, fwheader.Length);
+
+                byte[] fwheader = usb.Read();
+                //check mcu stage
+                if (fwheader.Length != (49 + 6))
+                {
+                    return -2;
+                }
+                if (fwheader[4] == DeviceStageRelease)
+                {
+                    Console.WriteLine("Secure Phase");
+                    s_securephase = true;
+                }
+                else
+                {
+                    if (fwheader[4] == DeviceStageDebug)
+                    {
+                        Console.WriteLine("Debug Phase");
+                        s_securephase = false;
+                    }
+                    else
+                    {
+                        Console.WriteLine("Unkonw Phase");
+                        return -2;
+                    }
+                }
 
                 //send 00
                 byte[] array00 = new byte[] { 0x4d, 0x48, 0x31, 0x39, 0x30, 0x33, 0x20, 0x52, 0x4f, 0x4d, 0x20, 0x42, 0x4f, 0x4f, 0x54, 0x00 };
@@ -650,19 +665,36 @@ namespace UsbLib
                     Console.WriteLine("read flashID error\n");
                     return -4;
                 }
-                Console.WriteLine("flashID:{0:X}\n", flashID);
 
-                //check flash id is right or not.
-/*
-                //write flash otp paras
-                setStatus("写入Flash参数至OTP");
-                if (writeFlashParas(flashID) != 0)
+                // check flash id is right or not.
+                Console.WriteLine("flashID:{0:X}\n", flashID);
+                if (flashID != FLASHID_BY25Q64AS)
                 {
-                    Console.WriteLine("writeFlashParas error\n");
+                    Console.WriteLine("Unsupport flush ID:{0:X}\n", flashID);
                     return -5;
                 }
-                Console.WriteLine("writeFlashParas ok\n");
-*/
+
+                // write flash paras and update mcu stage if debug mode.
+                if (s_securephase == false)
+                {
+                    //write flash otp paras
+                    setStatus("写入Flash参数至OTP");
+                    if (writeFlashParas(flashID) != 0)
+                    {
+                        Console.WriteLine("writeFlashParas error\n");
+                        return -5;
+                    }
+                    Console.WriteLine("writeFlashParas ok\n");
+
+                    // update MCU to release stage.
+                    if (injectRSApublickey(this.RSAPublicKey) != 0)
+                    {
+                        Console.WriteLine("ERROR:injectRSApublickey\n");
+                        return -6;
+                    }
+                }
+                //Console.WriteLine("RSAKEY:\n");
+                //PrintBuffer(RSAPublicKey,0, RSAPublicKey.Length);
 
                 //start step 3
                 if (writefirmwarehead(filename) != 0)
@@ -685,10 +717,10 @@ namespace UsbLib
                 setStatus("开始下载");
                 Console.WriteLine("downloadFile\n");
                 int ret = downloadFile(filename);
-                if ( ret != 0)
+                if (ret != 0)
                 {
                     Console.WriteLine("downloadFile error\n");
-                    setStatus(String.Format("下载失败,code={0}",ret));
+                    setStatus(String.Format("下载失败,code={0}", ret));
                     return -8;
                 }
                 Console.WriteLine("downloadFile OK\n");
@@ -700,7 +732,7 @@ namespace UsbLib
                 usb.Disconnect();
                 return -9;
             }
-            
+
             return 0;
         }
 
@@ -884,7 +916,7 @@ namespace UsbLib
                     sighead[2] = sighead[3] = 0x55;
 
                     System.IO.FileStream fileStream = System.IO.File.OpenRead(filename);
-                    if(fileStream.Read(sighead, 4, 0x34) != 0x34)
+                    if (fileStream.Read(sighead, 4, 0x34) != 0x34)
                     {
                         Console.WriteLine("Error: read sig file\n");
                         return -1;
@@ -981,7 +1013,7 @@ namespace UsbLib
 
         private static int eraseflash(bool eraseall)
         {
-            if(eraseall == true)
+            if (eraseall == true)
             {
                 Console.WriteLine("erase all");
                 if (eraseflash((UInt32)0x1000000, (UInt32)0xFFFFFFFF, 20000) != 0)
@@ -999,12 +1031,12 @@ namespace UsbLib
                 return 0;
             }
 
-            int secs = (int)(s_filesize/0x1000);
-            if((s_filesize % 0x1000) != 0)
+            int secs = (int)(s_filesize / 0x1000);
+            if ((s_filesize % 0x1000) != 0)
             {
                 secs += 1;
             }
-            Console.WriteLine("erase flash from 0x1001000 to {0:X8}" , 0x1001000 + secs*0x1000);
+            Console.WriteLine("erase flash from 0x1001000 to {0:X8}", 0x1001000 + secs * 0x1000);
 
             //erase first block
             if (eraseflash((UInt32)0x1000000, (UInt32)1, 260) != 0)
@@ -1035,7 +1067,7 @@ namespace UsbLib
             return 0;
         }
 
-        public int injectRSApublickey(byte[]rsakeyn)
+        public int injectRSApublickey(byte[] rsakeyn)
         {
             Console.WriteLine("injectRSApublickey");
             byte[] rsapkg = new byte[324];
@@ -1048,18 +1080,18 @@ namespace UsbLib
             }
 
             //SN
-            byte[] sn = new byte[16]{ 0x10,0x80,0x80,0x80, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+            byte[] sn = new byte[16] { 0x10, 0x80, 0x80, 0x80, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
             Random ra = new Random(unchecked((int)DateTime.Now.Ticks));
-            for (int i=0;i<8;i++)
+            for (int i = 0; i < 8; i++)
             {
-                sn[i + 4] = (byte)(ra.Next(0, 256)&0xff);
+                sn[i + 4] = (byte)(ra.Next(0, 256) & 0xff);
             }
             Array.Copy(sn, 0, rsapkg, 0, sn.Length);
             oft += 16;
 
             //Timeout 100
             rsapkg[oft] = 0x64;
-            rsapkg[oft+1] = 0x00;
+            rsapkg[oft + 1] = 0x00;
             oft += 2;
 
             //Res 0x0000
@@ -1081,7 +1113,7 @@ namespace UsbLib
             oft += 8;
 
             //N 
-            Array.Copy(rsakeyn,0,rsapkg,oft,256);
+            Array.Copy(rsakeyn, 0, rsapkg, oft, 256);
             oft += 256;
 
             /*IsEncrypt  
@@ -1152,31 +1184,31 @@ namespace UsbLib
                 ushort crc16;
                 int filesize = (int)s_filesize;
 
-                if(s_filetypeSIG == true)
+                if (s_filetypeSIG == true)
                 {
                     Console.WriteLine("download sig file\n");
                     filesize -= 0x138;
-                    //drop fist 0x134 bytes
+                    // drop fist 0x134 bytes
                     rlen = fileStream.Read(data, 0, 0x134);
-                    if(rlen != 0x134)
+                    if (rlen != 0x134)
                     {
                         Console.WriteLine("Error: read sig file\n");
                         return -1;
                     }
                 }
-                
+
                 while (true)
                 {
-                    if(oft+onelen > filesize)
+                    if (oft + onelen > filesize)
                     {
                         // last packet
                         onelen = filesize - oft;
                         Console.WriteLine("last packet {0}bytes", onelen);
                     }
                     rlen = fileStream.Read(data, 4, onelen);
-                    if (rlen > 0)
+                    if (rlen == onelen)
                     {
-                        //fixed the download address 0x1001000
+                        // fixed the download address 0x1001000
                         Array.Copy(BitConverter.GetBytes(dladdr + oft), 0, data, 0, 4);
                         if (usb.Write(data, rlen + 4, (Int32)0x80000) != true)
                         {
@@ -1190,17 +1222,16 @@ namespace UsbLib
                         alldata[2] = (byte)((rlen + 4) & 0xff);
                         alldata[3] = (byte)(((rlen + 4) >> 8) & 0xff);
                         crc16 = CRC16(alldata, rlen + 8);
-                        //crc16 = CRC16(alldata, alldata.Length);
-                        //PrintBuffer(alldata, 4, 16);
                         Console.WriteLine("crc16: {0:X} {1:X}\n", crc16, rlen);
-                        //send 21 cmd
+                        // send 21 cmd
                         if (writefirmwarecmd((ushort)(rlen + 4), crc16) != 0)
                         {
                             Console.WriteLine("Error: writefirmwarecmd\n");
-                            return -3;
+                            ret = -3;
+                            break;
                         }
 
-                        //update oft
+                        // update oft
                         oft += rlen;
                         if (oft == filesize)
                         {
@@ -1209,14 +1240,9 @@ namespace UsbLib
                             ret = 0;
                             break;
                         }
-                        else if (oft > filesize)
+                        else
                         {
-                            Console.WriteLine("error:oft {0} > {1}\n", oft, filesize);
-                            ret = -3;
-                            break;
-                        }
-                        else {
-                            setStatus(String.Format("下载进度:{0}%",oft*100/ filesize));
+                            setStatus(string.Format("下载进度:{0}%", oft * 100 / filesize));
                         }
                     }
                     else
