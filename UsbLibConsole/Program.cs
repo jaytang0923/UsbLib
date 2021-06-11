@@ -22,139 +22,139 @@ namespace UsbLibConsole
 
         static void PrintBuffer(byte[] buf, int start, int count)
         {
-            for (int i = start; i < count; i++)
-            {
-                if ((i % 16) == 0)
-                    Console.WriteLine("");
+            //for (int i = start; i < count; i++)
+            //{
+            //    if ((i % 16) == 0)
+            //        Console.WriteLine("");
 
-                Console.Write(string.Format("{0:X2} ", buf[i]));
-            }
+            //    Console.Write(string.Format("{0:X2} ", buf[i]));
+            //}
                 
                     
         }
 
-        private static void UsbDriverTest(String filename)
-        {
+//        private static void UsbDriverTest(String filename)
+//        {
             
-            try
-            {
-                usb = new UsbScsiDevice();
-                if(false){
-                    byte[] data = new byte[1024];
-                    usb.Write(data,(Int32)0x08000000);
-                    return;
-                }
-                Console.WriteLine($"Connect device: {usb.Connect("H")}");
+//            try
+//            {
+//                usb = new UsbScsiDevice();
+//                if(false){
+//                    byte[] data = new byte[1024];
+//                    usb.Write(data,(Int32)0x08000000);
+//                    return;
+//                }
+//                Console.WriteLine($"Connect device: {usb.Connect("H")}");
 
-                Console.WriteLine("start read Inquiry");
-                if (usb.Execute(ScsiCommandCode.Inquiry))
-                {
-                    byte[] po = usb.Inquiry.Sptw.GetDataBuffer();
+//                Console.WriteLine("start read Inquiry");
+//                if (usb.Execute(ScsiCommandCode.Inquiry))
+//                {
+//                    byte[] po = usb.Inquiry.Sptw.GetDataBuffer();
 
-                    Console.WriteLine("");
-                    Console.Write("Inquiry: ");
-                    for (int i = 0; i < 32; i++)
-                        Console.Write(string.Format("{0:X} ", po[i]));
-                }
-                else
-                    Console.WriteLine($"Bad command: {Marshal.GetLastWin32Error()}");
-                /*
-                if (usb.Execute(ScsiCommandCode.ReadCapacity))
-                {
-                    ReadCapacity rc10 = usb.ReadCapacity;
-                    UInt32 cntSector = rc10.CountSectors();
-                    UInt32 sizeSector = rc10.SizeSector();
-                    Console.WriteLine($"C: {cntSector}, S: {sizeSector}");
+//                    Console.WriteLine("");
+//                    Console.Write("Inquiry: ");
+//                    for (int i = 0; i < 32; i++)
+//                        Console.Write(string.Format("{0:X} ", po[i]));
+//                }
+//                else
+//                    Console.WriteLine($"Bad command: {Marshal.GetLastWin32Error()}");
+//                /*
+//                if (usb.Execute(ScsiCommandCode.ReadCapacity))
+//                {
+//                    ReadCapacity rc10 = usb.ReadCapacity;
+//                    UInt32 cntSector = rc10.CountSectors();
+//                    UInt32 sizeSector = rc10.SizeSector();
+//                    Console.WriteLine($"C: {cntSector}, S: {sizeSector}");
 
-                    UInt32 mb = (UInt32)(rc10.Capacity() / (1024 * 1024));
-                    Console.WriteLine($"Sectors: {cntSector} [{mb}] MB");
-                    Console.Write("ReadCapacity10: ");
-                    PrintBuffer(rc10.Sptw.GetDataBuffer(0, 8), 0, 8);
-                }
-                else
-                    Console.WriteLine($"Bad command: {Marshal.GetLastWin32Error()}");
-                */
-#if true
-                byte[] fwheader = usb.Read();
-                if (fwheader.Length == 0) {
-                    return;
-                }
-                Console.WriteLine("Get Info Success:\n");
-                PrintBuffer(fwheader, 0, fwheader.Length);
+//                    UInt32 mb = (UInt32)(rc10.Capacity() / (1024 * 1024));
+//                    Console.WriteLine($"Sectors: {cntSector} [{mb}] MB");
+//                    Console.Write("ReadCapacity10: ");
+//                    PrintBuffer(rc10.Sptw.GetDataBuffer(0, 8), 0, 8);
+//                }
+//                else
+//                    Console.WriteLine($"Bad command: {Marshal.GetLastWin32Error()}");
+//                */
+//#if true
+//                byte[] fwheader = usb.Read();
+//                if (fwheader.Length == 0) {
+//                    return;
+//                }
+//                Console.WriteLine("Get Info Success:\n");
+//                PrintBuffer(fwheader, 0, fwheader.Length);
 
-                //send 00
-                byte[] array00 = new byte[] { 0x4d, 0x48, 0x31, 0x39, 0x30, 0x33, 0x20, 0x52, 0x4f, 0x4d, 0x20, 0x42, 0x4f, 0x4f, 0x54, 0x00};
-                byte[] response0;
-                if (!usb.Write(array00, 16, out response0)) {
-                    return;
-                }
-                Console.WriteLine("Get Response00 length = {0}\n",response0.Length);
-                PrintBuffer(response0, 0, response0.Length);
+//                //send 00
+//                byte[] array00 = new byte[] { 0x4d, 0x48, 0x31, 0x39, 0x30, 0x33, 0x20, 0x52, 0x4f, 0x4d, 0x20, 0x42, 0x4f, 0x4f, 0x54, 0x00};
+//                byte[] response0;
+//                if (!usb.Write(array00, 16, out response0)) {
+//                    return;
+//                }
+//                Console.WriteLine("Get Response00 length = {0}\n",response0.Length);
+//                PrintBuffer(response0, 0, response0.Length);
 
-                //MH1903 Step 2,write 30
-                if (handleshake() != 0)
-                {
-                    Console.WriteLine("handleshake error\n");
-                    return;
-                }
-                Console.WriteLine("handleshake ok\n");
+//                //MH1903 Step 2,write 30
+//                if (handleshake() != 0)
+//                {
+//                    Console.WriteLine("handleshake error\n");
+//                    return;
+//                }
+//                Console.WriteLine("handleshake ok\n");
 
-                //read flashID
-                UInt32 flashID = 0;
-                if(readFlashID(out flashID) != 0)
-                {
-                    Console.WriteLine("read flashID error\n");
-                    return;
-                }
-                Console.WriteLine("flashID:{0:X}\n",flashID);
+//                //read flashID
+//                UInt32 flashID = 0;
+//                if(readFlashID(out flashID) != 0)
+//                {
+//                    Console.WriteLine("read flashID error\n");
+//                    return;
+//                }
+//                Console.WriteLine("flashID:{0:X}\n",flashID);
 
-                //check flash id is right or not.
+//                //check flash id is right or not.
 
-                //write flash otp paras
-                if (writeFlashParas(flashID) != 0)
-                {
-                    Console.WriteLine("writeFlashParas error\n");
-                    return;
-                }
-                Console.WriteLine("writeFlashParas ok\n");
-                return;
+//                //write flash otp paras
+//                if (writeFlashParas(flashID) != 0)
+//                {
+//                    Console.WriteLine("writeFlashParas error\n");
+//                    return;
+//                }
+//                Console.WriteLine("writeFlashParas ok\n");
+//                return;
 
-                //start step 3
-                Console.WriteLine("erase all flash\n");
-                if (writefirmwarehead(filename) != 0)
-                {
-                    Console.WriteLine("writefirmwarehead error\n");
-                    return;
-                }
-                Console.WriteLine("writefirmwarehead OK\n");
+//                //start step 3
+//                Console.WriteLine("erase all flash\n");
+//                if (writefirmwarehead(filename) != 0)
+//                {
+//                    Console.WriteLine("writefirmwarehead error\n");
+//                    return;
+//                }
+//                Console.WriteLine("writefirmwarehead OK\n");
 
-                //step 4 erase flash
-                Console.WriteLine("erase all flash\n");
-                if (eraseflash() != 0)
-                {
-                    Console.WriteLine("erase all flash error\n");
-                    return;
-                }
-                Console.WriteLine("erase all flash OK\n");
+//                //step 4 erase flash
+//                Console.WriteLine("erase all flash\n");
+//                if (eraseflash() != 0)
+//                {
+//                    Console.WriteLine("erase all flash error\n");
+//                    return;
+//                }
+//                Console.WriteLine("erase all flash OK\n");
 
-                //step4 download files
-                Console.WriteLine("downloadFile\n");
-                if (downloadFile(filename) != 0)
-                {
-                    Console.WriteLine("downloadFile error\n");
-                    return;
-                }
-                Console.WriteLine("downloadFile OK\n");
+//                //step4 download files
+//                Console.WriteLine("downloadFile\n");
+//                if (downloadFile(filename) != 0)
+//                {
+//                    Console.WriteLine("downloadFile error\n");
+//                    return;
+//                }
+//                Console.WriteLine("downloadFile OK\n");
 
-#endif
+//#endif
 
-            }
-            catch(Exception e)
-            {
-                Console.WriteLine($"Exception: {e.Message}");
-                usb.Disconnect();
-            }
-        }
+//            }
+//            catch(Exception e)
+//            {
+//                Console.WriteLine($"Exception: {e.Message}");
+//                usb.Disconnect();
+//            }
+//        }
 
         private static byte[] Int32ToBytes(uint number)
         {
@@ -420,7 +420,7 @@ namespace UsbLibConsole
 
         private static int writefirmwaredata(UInt32 addr, int size)
         {
-            int oft = 0;
+            //int oft = 0;
             return 0;
         }
         private static int writefirmwarecmd(UInt16 size, UInt16 crc16)
@@ -456,7 +456,7 @@ namespace UsbLibConsole
                 int oft=0,rlen = 0;
                 int ret = -1;
                 int onelen = 0x8000;
-                UInt32 addr = 0x08000000;
+                //UInt32 addr = 0x08000000;
                 UInt32 dladdr = 0x1001000;
                 byte[] data = new byte[onelen + 4];
                 byte[] alldata = new byte[data.Length + 4];
@@ -676,19 +676,74 @@ namespace UsbLibConsole
                              .ToArray();
         }
 
+        public static byte[] readrsakeydata(string rsakey)
+        {
+            const string HeadRsaN = "pub_key n:";
+            byte[] rsapubkeyn = null;
+            StreamReader rsafile = File.OpenText(rsakey);
+            string txtdata;
+            while((txtdata = rsafile.ReadLine()) != null)
+            {
+                if(txtdata.Contains(HeadRsaN))
+                {
+                    
+                    string rsakeynstr = txtdata.Substring(HeadRsaN.Length);
+                    
+                    rsapubkeyn = StringToByteArray(rsakeynstr);
+                    Console.WriteLine("find pub_key n: {0} {1}\n{2}", rsakeynstr, rsapubkeyn.Length, PrintByteArray(rsapubkeyn));
+                    break;
+                }
+            }
+            rsafile.Close();
+            return rsapubkeyn;
+        }
+
         static void Main(string[] args)
         {
+            if (args != null)
+            {
+                if(args.Length >= 2)
+                {
+                    string uboot = args[0];
+                    string udisk = args[1];
+                    string rsakeyfile = null;
+                    byte[] rsakeyn = null;
+                    if (!File.Exists(uboot))
+                    {
+                        Console.WriteLine("bootloader [{0}] not exist!", uboot);
+                        return;
+                    }
+
+                    if (args.Length >= 3)
+                    {
+                        rsakeyfile = args[2]; 
+                        if(!File.Exists(rsakeyfile))
+                        {
+                            Console.WriteLine("rsakey [{0}] not exist!", rsakeyfile);
+                            return;
+                        }
+                        rsakeyn = readrsakeydata(rsakeyfile);
+                        if(rsakeyn.Length != 256)
+                        {
+                            Console.WriteLine("rsakey data length[{0}] not match.!", rsakeyn.Length);
+                            return;
+                        }
+                    }
+                    USBDownLoad usbdl = new USBDownLoad();
+                    usbdl.USBDownloadFile(uboot,udisk, rsakeyn);
+                }
+            }
             //UsbDriverTest("CY21BootLoaderv0.2.1.bin");
             //UsbDriverTest("test.bin");
             //downloadFile("test.bin");
-            USBDownLoad usbdl = new USBDownLoad();
+            //USBDownLoad usbdl = new USBDownLoad();
             //usbdl.USBDownloadFile("CY20BootLoaderv0.2.6.bin", "H");
-            usbdl.USBDownloadFile("CY20BootLoaderv0.2.6.sig", "H");
-            string strrsa = "CA9CB139002106582CD4593215C8CED6C9DDEDC2F2825A00EDA7D69C128B12C31DC1F79DBBFFB49BF8ED0335BCE12A96590BBC164A5782B6E8EE268F0028962AD0598FAD5D83A9967EEAD6B2A36A3E4E0A186F73A007C689092E8E5A0BC112EE8F8AB0145CB6628C025DF5509FF92E848886F5E9B7AB3C01C971213A702EF56097A3D5792A3DBC4421A1199CF237FB924FB8179BBEFF4249A74060F54E841A3E3A48CB7CEF4B8774A5CC43163FE907252D425877F0208B91F8C4D6AA31986F882621B76D4AE8E50D52BDD5781D9A5C9A0F16429A1DFB7F759E1DA459AD357E9503DC83D99AC75AFE30357A42CF03E0455C039FF7FB23B233F5ADCECEC12F1A65";
-            byte[] rsakey = StringToByteArray(strrsa);
+            //usbdl.USBDownloadFile("CY20P-1TWCBootLoaderv0.3.3.sig", "H");
+            //string strrsa = "CA9CB139002106582CD4593215C8CED6C9DDEDC2F2825A00EDA7D69C128B12C31DC1F79DBBFFB49BF8ED0335BCE12A96590BBC164A5782B6E8EE268F0028962AD0598FAD5D83A9967EEAD6B2A36A3E4E0A186F73A007C689092E8E5A0BC112EE8F8AB0145CB6628C025DF5509FF92E848886F5E9B7AB3C01C971213A702EF56097A3D5792A3DBC4421A1199CF237FB924FB8179BBEFF4249A74060F54E841A3E3A48CB7CEF4B8774A5CC43163FE907252D425877F0208B91F8C4D6AA31986F882621B76D4AE8E50D52BDD5781D9A5C9A0F16429A1DFB7F759E1DA459AD357E9503DC83D99AC75AFE30357A42CF03E0455C039FF7FB23B233F5ADCECEC12F1A65";
+            //byte[] rsakey = StringToByteArray(strrsa);
 
             //usbdl.injectRSApublickey(rsakey);
-            Console.ReadLine();
+            //Console.ReadLine();
         }
     }
 }
