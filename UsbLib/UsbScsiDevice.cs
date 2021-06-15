@@ -552,17 +552,17 @@ namespace UsbLib
         static void PrintBuffer(byte[] buf, int start, int count)
         {
             //if (false)
-            //{
-            //    for (int i = start; i < count; i++)
-            //    {
-            //        if ((i % 16) == 0)
-            //        {
-            //            Console.WriteLine("");
-            //        }
+            {
+                for (int i = start; i < count; i++)
+                {
+                    if ((i % 16) == 0)
+                    {
+                        Console.WriteLine("");
+                    }
 
-            //        Console.Write(string.Format("{0:X2} ", buf[i]));
-            //    }
-            //}
+                    Console.Write(string.Format("{0:X2} ", buf[i]));
+                }
+            }
         }
 
         private int Getfileinfo(string filename)
@@ -719,7 +719,7 @@ namespace UsbLib
                     }else
                     {
                         setStatus("写Flash参数");
-                        if (writeFlashParas(flashID, true) != 0)
+                        if (writeFlashParas(flashID, false) != 0)
                         {
                             Console.WriteLine("writeFlashParas error\n");
                             return -5;
@@ -793,7 +793,7 @@ namespace UsbLib
             Array.Copy(cmdpkt, 0, usbpkt, arrayhead.Length, cmdpkt.Length);
 
             string msg = PrintByteArray(usbpkt);
-            //Console.WriteLine(msg);
+            Console.WriteLine(msg);
             if (!usb.Write(usbpkt, (UInt32)usbpkt.Length))
             {
                 Console.WriteLine("write usbpkt error");
@@ -930,8 +930,8 @@ namespace UsbLib
                 cmddata[0] = cmddata[1] = cmddata[2] = cmddata[3] = 0x55;
             }
             PrintBuffer(cmddata, 0, cmddata.Length);
-
-            if (executecmd((byte)0x18, cmddata) != 0)
+            //write flash paras need timeout here.
+            if (executecmd((byte)0x18, cmddata, 500) != 0)
             {
                 Console.WriteLine("Error: wrtie flash paras to flash");
                 //return -2;
@@ -1298,18 +1298,18 @@ namespace UsbLib
         private static string PrintByteArray(byte[] array)
         {
             //if (false)
-            //{
+            {
 
 
-            //    StringBuilder sb = new StringBuilder();
-            //    int i;
-            //    for (i = 0; i < array.Length; i++)
-            //    {
-            //        sb.Append(String.Format("{0:X2}", array[i]));
+                StringBuilder sb = new StringBuilder();
+                int i;
+                for (i = 0; i < array.Length; i++)
+                {
+                    sb.Append(String.Format("{0:X2}", array[i]));
 
-            //    }
-            //    return sb.ToString();
-            //}
+                }
+                return sb.ToString();
+            }
             return null;
         }
 
