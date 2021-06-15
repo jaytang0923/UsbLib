@@ -506,18 +506,18 @@ namespace UsbLib
 
         static void PrintBuffer(byte[] buf, int start, int count)
         {
-            if (false)
-            {
-                for (int i = start; i < count; i++)
-                {
-                    if ((i % 16) == 0)
-                    {
-                        //Console.WriteLine("");
-                    }
+            //if (false)
+            //{
+            //    for (int i = start; i < count; i++)
+            //    {
+            //        if ((i % 16) == 0)
+            //        {
+            //            //Console.WriteLine("");
+            //        }
 
-                   //Console.Write(string.Format("{0:X2} ", buf[i]));
-                }
-            }
+            //       //Console.Write(string.Format("{0:X2} ", buf[i]));
+            //    }
+            //}
         }
     }
 
@@ -551,18 +551,18 @@ namespace UsbLib
 
         static void PrintBuffer(byte[] buf, int start, int count)
         {
-            if (false)
-            {
-                for (int i = start; i < count; i++)
-                {
-                    if ((i % 16) == 0)
-                    {
-                        Console.WriteLine("");
-                    }
+            //if (false)
+            //{
+            //    for (int i = start; i < count; i++)
+            //    {
+            //        if ((i % 16) == 0)
+            //        {
+            //            Console.WriteLine("");
+            //        }
 
-                    Console.Write(string.Format("{0:X2} ", buf[i]));
-                }
-            }
+            //        Console.Write(string.Format("{0:X2} ", buf[i]));
+            //    }
+            //}
         }
 
         private int Getfileinfo(string filename)
@@ -613,7 +613,7 @@ namespace UsbLib
                 }
 
                 usb = new UsbScsiDevice();
-                setStatus("Connect MCU");
+                setStatus("连接MCU...");
                 if (usb.Connect(usbdisk) == false)
                 {
                    //Console.WriteLine($"Connect device: {usb.Connect(usbdisk)}");
@@ -644,14 +644,14 @@ namespace UsbLib
                 }
                 if (fwheader[4] == DeviceStageRelease)
                 {
-                    Console.WriteLine("Secure Phase");
+                    Console.WriteLine("安全阶段");
                     s_securephase = true;
                 }
                 else
                 {
                     if (fwheader[4] == DeviceStageDebug)
                     {
-                        Console.WriteLine("Debug Phase");
+                        Console.WriteLine("调试阶段");
                         s_securephase = false;
                     }
                     else
@@ -671,7 +671,6 @@ namespace UsbLib
                 //Console.WriteLine("Get Response00 length = {0}\n", response0.Length);
                 PrintBuffer(response0, 0, response0.Length);
 
-                setStatus("start handleshake...");
                 //MH1903 Step 2,write 30
                 if (handleshake() != 0)
                 {
@@ -681,7 +680,7 @@ namespace UsbLib
                 //Console.WriteLine("handleshake ok\n");
 
                 //read flashID
-                setStatus("read FlashID");
+                setStatus("读取FlashID");
                 UInt32 flashID = 0;
                 if (readFlashID(out flashID) != 0)
                 {
@@ -698,22 +697,33 @@ namespace UsbLib
                 }
 
                 // write flash paras and update mcu stage if debug mode.
-                if (s_securephase == false && s_updatemcu == true)
+                if (s_securephase == false)
                 {
-                    //write flash otp paras
-                    setStatus("write Flash paras to OTP");
-                    if (writeFlashParas(flashID) != 0)
+                    if (s_updatemcu == true)
                     {
-                        Console.WriteLine("writeFlashParas error\n");
-                        return -5;
-                    }
-                   //Console.WriteLine("writeFlashParas ok\n");
+                        //write flash otp paras
+                        setStatus("写Flash参数到OTP");
+                        if (writeFlashParas(flashID, true) != 0)
+                        {
+                            Console.WriteLine("writeFlashParas OTP error\n");
+                            return -5;
+                        }
+                        //Console.WriteLine("writeFlashParas ok\n");
 
-                    // update MCU to release stage.
-                    if (injectRSApublickey(this.RSAPublicKey) != 0)
+                        // update MCU to release stage.
+                        if (injectRSApublickey(this.RSAPublicKey) != 0)
+                        {
+                            Console.WriteLine("ERROR:injectRSApublickey\n");
+                            return -6;
+                        }
+                    }else
                     {
-                        Console.WriteLine("ERROR:injectRSApublickey\n");
-                        return -6;
+                        setStatus("写Flash参数");
+                        if (writeFlashParas(flashID, true) != 0)
+                        {
+                            Console.WriteLine("writeFlashParas error\n");
+                            return -5;
+                        }
                     }
                 }
                 //Console.WriteLine("RSAKEY:\n");
@@ -737,7 +747,7 @@ namespace UsbLib
                //Console.WriteLine("erase flash OK\n");
 
                 //step4 download files
-                setStatus("start download bootloader");
+                setStatus("开始下载Bootloader");
                //Console.WriteLine("downloadFile\n");
                 int ret = downloadFile(filename);
                 if (ret != 0)
@@ -746,8 +756,7 @@ namespace UsbLib
                     setStatus(String.Format("下载失败,code={0}", ret));
                     return -8;
                 }
-                Console.WriteLine("download bootloader OK\n");
-                setStatus("download finish!");
+                setStatus("下载Bootloader成功!");
             }
             catch (Exception e)
             {
@@ -878,7 +887,7 @@ namespace UsbLib
             return 0;
         }
 
-        private static int writeFlashParas(UInt32 flashID)
+        private static int writeFlashParas(UInt32 flashID,bool tootp)
         {
             UInt32[] flashID_support = new UInt32[] {
                 0x684017,
@@ -916,7 +925,10 @@ namespace UsbLib
             {
                 Array.Copy(BitConverter.GetBytes(paras[i]), 0, cmddata, i * 4, 4);
             }
-
+            if(tootp == false)
+            {
+                cmddata[0] = cmddata[1] = cmddata[2] = cmddata[3] = 0x55;
+            }
             PrintBuffer(cmddata, 0, cmddata.Length);
 
             if (executecmd((byte)0x18, cmddata) != 0)
@@ -1151,8 +1163,6 @@ namespace UsbLib
 
             //execute inject cmd
             PrintBuffer(rsapkg, 0, rsapkg.Length);
-            return 0;
-
             if (executecmd((byte)0x12, rsapkg) != 0)
             {
                 Console.WriteLine("Error: inject RSA key");
@@ -1164,7 +1174,7 @@ namespace UsbLib
 
         private static int writefirmwaredata(UInt32 addr, int size)
         {
-            int oft = 0;
+            //int oft = 0;
             return 0;
         }
         private static int writefirmwarecmd(UInt16 size, UInt16 crc16)
@@ -1200,7 +1210,7 @@ namespace UsbLib
                 int oft = 0, rlen = 0;
                 int ret = -1;
                 int onelen = 0x8000;
-                UInt32 addr = 0x08000000;
+                //UInt32 addr = 0x08000000;
                 UInt32 dladdr = 0x1001000;
                 byte[] data = new byte[onelen + 4];
                 byte[] alldata = new byte[data.Length + 4];
@@ -1259,13 +1269,13 @@ namespace UsbLib
                         if (oft == filesize)
                         {
                            //Console.WriteLine("EOT\n");
-                            setStatus("Progress:100%");
+                            setStatus("进度:100%");
                             ret = 0;
                             break;
                         }
                         else
                         {
-                            setStatus(string.Format("Progress:{0}%", oft * 100 / filesize));
+                            setStatus(string.Format("进度:{0}%", oft * 100 / filesize));
                         }
                     }
                     else
@@ -1287,19 +1297,19 @@ namespace UsbLib
 
         private static string PrintByteArray(byte[] array)
         {
-            if (false)
-            {
+            //if (false)
+            //{
 
 
-                StringBuilder sb = new StringBuilder();
-                int i;
-                for (i = 0; i < array.Length; i++)
-                {
-                    sb.Append(String.Format("{0:X2}", array[i]));
+            //    StringBuilder sb = new StringBuilder();
+            //    int i;
+            //    for (i = 0; i < array.Length; i++)
+            //    {
+            //        sb.Append(String.Format("{0:X2}", array[i]));
 
-                }
-                return sb.ToString();
-            }
+            //    }
+            //    return sb.ToString();
+            //}
             return null;
         }
 
