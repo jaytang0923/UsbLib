@@ -84,7 +84,7 @@ namespace UsbLibConsole
                     return usbdl.USBDownloadFile(uboot,udisk, rsakeyn);
                 }
             }
-            return -13;
+            return -1;
         }
     }
 }

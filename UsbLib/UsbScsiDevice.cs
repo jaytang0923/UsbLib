@@ -593,7 +593,7 @@ namespace UsbLib
             {
                 if (this.Getfileinfo(filename) != 0)
                 {
-                    Console.WriteLine("getfileinfo error");
+                    setStatus("getfileinfo error");
                     return -1;
                 }
 
@@ -644,19 +644,19 @@ namespace UsbLib
                 }
                 if (fwheader[4] == DeviceStageRelease)
                 {
-                    Console.WriteLine("安全阶段");
+                    setStatus("安全阶段");
                     s_securephase = true;
                 }
                 else
                 {
                     if (fwheader[4] == DeviceStageDebug)
                     {
-                        Console.WriteLine("调试阶段");
+                        setStatus("调试阶段");
                         s_securephase = false;
                     }
                     else
                     {
-                        Console.WriteLine("Unkonw Phase");
+                        setStatus("Unkonw Phase");
                         return -2;
                     }
                 }
@@ -674,7 +674,7 @@ namespace UsbLib
                 //MH1903 Step 2,write 30
                 if (handleshake() != 0)
                 {
-                    Console.WriteLine("handleshake error\n");
+                    setStatus("handleshake error\n");
                     return -3;
                 }
                 //Console.WriteLine("handleshake ok\n");
@@ -684,7 +684,7 @@ namespace UsbLib
                 UInt32 flashID = 0;
                 if (readFlashID(out flashID) != 0)
                 {
-                    Console.WriteLine("read flashID error\n");
+                    setStatus("read flashID error\n");
                     return -4;
                 }
 
@@ -692,7 +692,7 @@ namespace UsbLib
                //Console.WriteLine("flashID:{0:X}\n", flashID);
                 if (flashID != FLASHID_BY25Q64AS)
                 {
-                    Console.WriteLine("Unsupport flush ID:{0:X}\n", flashID);
+                    setStatus(String.Format("Unsupport flush ID:{0:X}", flashID));
                     return -5;
                 }
 
@@ -705,23 +705,26 @@ namespace UsbLib
                         setStatus("写Flash参数到OTP");
                         if (writeFlashParas(flashID, true) != 0)
                         {
-                            Console.WriteLine("writeFlashParas OTP error\n");
+                            setStatus("写Flash参数到OTP失败!\n");
                             return -5;
                         }
                         //Console.WriteLine("writeFlashParas ok\n");
 
                         // update MCU to release stage.
+                        setStatus("升级MCU...");
                         if (injectRSApublickey(this.RSAPublicKey) != 0)
                         {
-                            Console.WriteLine("ERROR:injectRSApublickey\n");
+                            setStatus("升级MCU失败!");
                             return -6;
                         }
-                    }else
+                        setStatus("升级MCU成功!");
+                    }
+                    else
                     {
                         setStatus("写Flash参数");
                         if (writeFlashParas(flashID, false) != 0)
                         {
-                            Console.WriteLine("writeFlashParas error\n");
+                            setStatus("写Flash参数到Flash失败!\n");
                             return -5;
                         }
                     }
@@ -732,7 +735,7 @@ namespace UsbLib
                 //start step 3
                 if (writefirmwarehead(filename) != 0)
                 {
-                    Console.WriteLine("writefirmwarehead error\n");
+                    setStatus("写固件头失败!");
                     return -6;
                 }
                //Console.WriteLine("writefirmwarehead OK\n");
@@ -741,7 +744,7 @@ namespace UsbLib
                //Console.WriteLine("erase flash\n");
                 if (eraseflash(false) != 0)
                 {
-                    Console.WriteLine("erase flash error\n");
+                    setStatus("擦除flash失败!");
                     return -7;
                 }
                //Console.WriteLine("erase flash OK\n");
@@ -752,7 +755,7 @@ namespace UsbLib
                 int ret = downloadFile(filename);
                 if (ret != 0)
                 {
-                    Console.WriteLine("downloadFile error\n");
+                    //Console.WriteLine("downloadFile error\n");
                     setStatus(String.Format("下载失败,code={0}", ret));
                     return -8;
                 }
@@ -760,7 +763,7 @@ namespace UsbLib
             }
             catch (Exception e)
             {
-                Console.WriteLine($"Exception: {e.Message}");
+                setStatus($"Exception: {e.Message}");
                 usb.Disconnect();
                 return -9;
             }
@@ -934,7 +937,7 @@ namespace UsbLib
             if (executecmd((byte)0x18, cmddata, 500) != 0)
             {
                 Console.WriteLine("Error: wrtie flash paras to flash");
-                //return -2;
+                return -2;
             }
             return 0;
         }
@@ -1104,8 +1107,8 @@ namespace UsbLib
 
         public int injectRSApublickey(byte[] rsakeyn)
         {
-            Console.WriteLine("injectRSApublickey");
-            byte[] rsapkg = new byte[324];
+            //Console.WriteLine("升级MCU...");
+            byte[] rsapkg = new byte[292];   //acturelly not include aeskey and aesIV(32 bytes).
             int oft = 0;
 
             //format rsapkg to all 0
@@ -1163,12 +1166,12 @@ namespace UsbLib
 
             //execute inject cmd
             PrintBuffer(rsapkg, 0, rsapkg.Length);
-            if (executecmd((byte)0x12, rsapkg) != 0)
+            if (executecmd((byte)0x12, rsapkg, 800) != 0)
             {
-                Console.WriteLine("Error: inject RSA key");
+                //Console.WriteLine("升级MCU失败!");
                 return -1;
             }
-           //Console.WriteLine("inject RSA key success.");
+           //Console.WriteLine("升级MCU成功!");
             return 0;
         }
 
