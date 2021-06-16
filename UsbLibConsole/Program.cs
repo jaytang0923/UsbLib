@@ -74,13 +74,13 @@ namespace UsbLibConsole
                         eraseall = true;
                     }else
                     {
-                        Console.WriteLine("不支持的参数");
+                        Console.WriteLine(string.Format("不支持的参数:{0},{1}",args[2],args[2].Length));
                         return -1;
                     }
 
                     if (!File.Exists(uboot))
                     {
-                        Console.WriteLine("bootloader [{0}] not exist!", uboot);
+                        Console.WriteLine("bootloader [{0}]不存在!", uboot);
                         return -10;
                     }
 
@@ -95,7 +95,7 @@ namespace UsbLibConsole
                         rsakeyn = readrsakeydata(rsakeyfile);
                         if(rsakeyn.Length != 256)
                         {
-                            Console.WriteLine("rsakey data length[{0}] not match.!", rsakeyn.Length);
+                            Console.WriteLine("rsakey数据长度[{0}]不匹配!", rsakeyn.Length);
                             return -12;
                         }
                     }

@@ -795,8 +795,8 @@ namespace UsbLib
             Array.Copy(arrayhead, 0, usbpkt, 0, arrayhead.Length);
             Array.Copy(cmdpkt, 0, usbpkt, arrayhead.Length, cmdpkt.Length);
 
-            string msg = PrintByteArray(usbpkt);
-            Console.WriteLine(msg);
+            //string msg = PrintByteArray(usbpkt);
+            //Console.WriteLine(msg);
             if (!usb.Write(usbpkt, (UInt32)usbpkt.Length))
             {
                 Console.WriteLine("write usbpkt error");
