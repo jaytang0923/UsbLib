@@ -48,25 +48,45 @@ namespace UsbLibConsole
             return rsapubkeyn;
         }
 
+        /*
+         UsbLibConsole.exe CY20P-1TWCBootLoaderv0.3.3.bin H true CY2XBootloader.rsa
+         para1: bootloader
+         para2: USB Disk
+         para3: erase all flash
+         para4: rsakey : if exist will update the mcu.
+        */
         static int Main(string[] args)
         {
             if (args != null)
             {
-                if(args.Length >= 2)
+                if(args.Length >= 3)
                 {
                     string uboot = args[0];
                     string udisk = args[1];
+                    bool eraseall = true;
                     string rsakeyfile = null;
                     byte[] rsakeyn = null;
+                    if (args[2] == "false")
+                    {
+                        eraseall = false;
+                    }else if(args[2] == "true")
+                    {
+                        eraseall = true;
+                    }else
+                    {
+                        Console.WriteLine("不支持的参数");
+                        return -1;
+                    }
+
                     if (!File.Exists(uboot))
                     {
                         Console.WriteLine("bootloader [{0}] not exist!", uboot);
                         return -10;
                     }
 
-                    if (args.Length >= 3)
+                    if (args.Length >= 4)
                     {
-                        rsakeyfile = args[2]; 
+                        rsakeyfile = args[3]; 
                         if(!File.Exists(rsakeyfile))
                         {
                             Console.WriteLine("RSAKEY[{0}]不存在!", rsakeyfile);
@@ -81,7 +101,7 @@ namespace UsbLibConsole
                     }
                     Console.WriteLine("开始USB下载....");
                     USBDownLoad usbdl = new USBDownLoad();
-                    return usbdl.USBDownloadFile(uboot,udisk, rsakeyn);
+                    return usbdl.USBDownloadFile(uboot,udisk, eraseall, rsakeyn);
                 }
             }
             return -1;
