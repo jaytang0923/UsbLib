@@ -552,17 +552,17 @@ namespace UsbLib
         static void PrintBuffer(byte[] buf, int start, int count)
         {
             //if (false)
-            {
-                for (int i = start; i < count; i++)
-                {
-                    if ((i % 16) == 0)
-                    {
-                        Console.WriteLine("");
-                    }
+            //{
+            //    for (int i = start; i < count; i++)
+            //    {
+            //        if ((i % 16) == 0)
+            //        {
+            //            Console.WriteLine("");
+            //        }
 
-                    Console.Write(string.Format("{0:X2} ", buf[i]));
-                }
-            }
+            //        Console.Write(string.Format("{0:X2} ", buf[i]));
+            //    }
+            //}
         }
 
         private int Getfileinfo(string filename)
@@ -586,7 +586,7 @@ namespace UsbLib
             return 0;
         }
 
-        public int USBDownloadFile(String filename, String usbdisk, byte[] rsakeyn)
+        public int USBDownloadFile(String filename, String usbdisk, bool eraseall,byte[] rsakeyn)
         {
 
             try
@@ -669,7 +669,7 @@ namespace UsbLib
                     return -2;
                 }
                 //Console.WriteLine("Get Response00 length = {0}\n", response0.Length);
-                PrintBuffer(response0, 0, response0.Length);
+                //PrintBuffer(response0, 0, response0.Length);
 
                 //MH1903 Step 2,write 30
                 if (handleshake() != 0)
@@ -742,7 +742,7 @@ namespace UsbLib
 
                 //step 4 erase flash
                //Console.WriteLine("erase flash\n");
-                if (eraseflash(false) != 0)
+                if (eraseflash(eraseall) != 0)
                 {
                     setStatus("擦除flash失败!");
                     return -7;
@@ -1053,7 +1053,7 @@ namespace UsbLib
         {
             if (eraseall == true)
             {
-               //Console.WriteLine("erase all");
+                setStatus("擦除所有flash扇区...");
                 if (eraseflash((UInt32)0x1000000, (UInt32)0xFFFFFFFF, 20000) != 0)
                 {
                     Console.WriteLine("erase all flash error\n");
@@ -1074,7 +1074,7 @@ namespace UsbLib
             {
                 secs += 1;
             }
-           //Console.WriteLine("erase flash from 0x1001000 to {0:X8}", 0x1001000 + secs * 0x1000);
+            setStatus(string.Format("擦除flash从0x1001000到{0:X8}", 0x1001000 + secs * 0x1000));
 
             //erase first block
             if (eraseflash((UInt32)0x1000000, (UInt32)1, 260) != 0)
@@ -1301,18 +1301,18 @@ namespace UsbLib
         private static string PrintByteArray(byte[] array)
         {
             //if (false)
-            {
+            //{
 
 
-                StringBuilder sb = new StringBuilder();
-                int i;
-                for (i = 0; i < array.Length; i++)
-                {
-                    sb.Append(String.Format("{0:X2}", array[i]));
+            //    StringBuilder sb = new StringBuilder();
+            //    int i;
+            //    for (i = 0; i < array.Length; i++)
+            //    {
+            //        sb.Append(String.Format("{0:X2}", array[i]));
 
-                }
-                return sb.ToString();
-            }
+            //    }
+            //    return sb.ToString();
+            //}
             return null;
         }
 
