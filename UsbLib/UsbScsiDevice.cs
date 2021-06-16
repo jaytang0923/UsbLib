@@ -423,12 +423,12 @@ namespace UsbLib
             Array.Copy(data, 0, buf, 0, datalen);
             if (!this.Execute(ScsiCommandCode.Write10))
             {
-               //Console.WriteLine("Error Ioctl: 0x{0:X8}", this.usb.GetError());
+                Console.WriteLine("Error Ioctl: 0x{0:X8}", this.usb.GetError());
                 return false;
             }
             if (!this.Execute(ScsiCommandCode.Read10))
             {
-               //Console.WriteLine("Error Ioctl: 0x{0:X8}", this.usb.GetError());
+                Console.WriteLine("Error Ioctl: 0x{0:X8}", this.usb.GetError());
                 return false;
             }
             var recdata = this.Read10.Sptw.GetDataBuffer();
@@ -644,7 +644,6 @@ namespace UsbLib
                     return -2;
                 }
                 Array.Copy(fwheader, 5, UID, 0, UID.Length);
-
                 if (fwheader[4] == DeviceStageRelease)
                 {
                     setStatus("安全阶段");
@@ -687,18 +686,16 @@ namespace UsbLib
                 UInt32 flashID = 0;
                 if (readFlashID(out flashID) != 0)
                 {
-                    setStatus("read flashID error\n");
+                    setStatus("读取flashID失败\n");
                     return -4;
                 }
 
                 // check flash id is right or not.
-               //Console.WriteLine("flashID:{0:X}\n", flashID);
                 if (flashID != FLASHID_BY25Q64AS)
                 {
-                    setStatus(String.Format("Unsupport flush ID:{0:X}", flashID));
+                    setStatus(String.Format("不支持的flush ID:{0:X}", flashID));
                     return -5;
                 }
-
                 // write flash paras and update mcu stage if debug mode.
                 if (s_securephase == false)
                 {
@@ -877,21 +874,33 @@ namespace UsbLib
             Array.Copy(arrayhead, 0, usbpkt, 0, arrayhead.Length);
             Array.Copy(cmdpkt, 0, usbpkt, arrayhead.Length, cmdpkt.Length);
 
-            //string msg = PrintByteArray(usbpkt);
-            //Console.WriteLine(msg);
-
             byte[] flashid;
+            int retry = 5;
             flashID = 0;
-            if (!usb.Write(usbpkt, (UInt32)usbpkt.Length, out flashid))
+            while (retry-- > 0)
             {
-                Console.WriteLine("write usbpkt error");
-                return -1;
-            }
+                flashID = 0;
+                if (!usb.Write(usbpkt, (UInt32)usbpkt.Length, out flashid))
+                {
+                    Console.WriteLine("write usbpkt error");
+                    System.Threading.Thread.Sleep(100);
+                    continue;
+                }
 
-            flashID = (UInt32)(flashid[4] | (flashid[5] << 8) + (flashid[6] << 16));
-            //Console.WriteLine("Get Response length = {0} 0X{1:X}\n", flashid.Length, flashID);
-            PrintBuffer(flashid, 0, flashid.Length);
-            return 0;
+                if (flashid.Length != (3 + 6))
+                {
+                    setStatus("response length error");
+                    //setStatus(string.Format("responseLen:{0}", flashid.Length));
+                    string msg = PrintByteArray(flashid);
+                    //setStatus(msg);
+                    System.Threading.Thread.Sleep(100);
+                    continue;
+                }
+                flashID = (UInt32)(flashid[4] | (flashid[5] << 8) + (flashid[6] << 16));
+                return 0;
+            }
+            //setStatus(string.Format("13 {0:X}", flashID));
+            return -1;
         }
 
         private static int writeFlashParas(UInt32 flashID,bool tootp)
@@ -1302,7 +1311,7 @@ namespace UsbLib
             return -1;
         }
 
-        public string PrintByteArray(byte[] array)
+        public static string PrintByteArray(byte[] array)
         {
             StringBuilder sb = new StringBuilder();
             int i;

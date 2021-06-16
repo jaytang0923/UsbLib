@@ -104,7 +104,7 @@ namespace UsbLibConsole
                     int ret = usbdl.USBDownloadFile(uboot,udisk, eraseall, rsakeyn);
                     if(ret == 0)
                     {
-                        string uid = usbdl.PrintByteArray(usbdl.UID);
+                        string uid = USBDownLoad.PrintByteArray(usbdl.UID);
                         string phase;
                         if(usbdl.s_securephase == true)
                         {
