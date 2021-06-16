@@ -101,7 +101,22 @@ namespace UsbLibConsole
                     }
                     Console.WriteLine("开始USB下载....");
                     USBDownLoad usbdl = new USBDownLoad();
-                    return usbdl.USBDownloadFile(uboot,udisk, eraseall, rsakeyn);
+                    int ret = usbdl.USBDownloadFile(uboot,udisk, eraseall, rsakeyn);
+                    if(ret == 0)
+                    {
+                        string uid = usbdl.PrintByteArray(usbdl.UID);
+                        string phase;
+                        if(usbdl.s_securephase == true)
+                        {
+                            phase = "4";
+                        }else
+                        {
+                            phase = "3";
+                        }
+                        //report UID + Phase = 32 + 1 bytes
+                        Console.WriteLine("UID[{0}][{1}]",uid,phase);
+                    }
+                    return ret;
                 }
             }
             return -1;

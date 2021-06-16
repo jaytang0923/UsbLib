@@ -532,11 +532,12 @@ namespace UsbLib
         private static string currentStausmsg = "测试";
         private static long s_filesize = 0; //the bootloader size
         private static bool s_filetypeSIG = true;
-        private static bool s_securephase = true;
+        public bool s_securephase = true;
 
         public byte[] RSAPublicKey = new byte[256]; // n of rsa 2048
         // write the flash paras to flash otp and update the mcu to phase 4 if RSAPublicKey is coming.
-        private static bool s_updatemcu = false; 
+        private static bool s_updatemcu = false;
+        public byte[] UID = new byte[16];
 
         public string getStatus()
         {
@@ -642,6 +643,8 @@ namespace UsbLib
                 {
                     return -2;
                 }
+                Array.Copy(fwheader, 5, UID, 0, UID.Length);
+
                 if (fwheader[4] == DeviceStageRelease)
                 {
                     setStatus("安全阶段");
@@ -718,6 +721,7 @@ namespace UsbLib
                             return -6;
                         }
                         setStatus("升级MCU成功!");
+                        s_securephase = true;
                     }
                     else
                     {
@@ -815,7 +819,7 @@ namespace UsbLib
             Array.Copy(arrayhead, 0, usbpkt, 0, arrayhead.Length);
             Array.Copy(cmdpkt, 0, usbpkt, arrayhead.Length, cmdpkt.Length);
 
-            string msg = PrintByteArray(usbpkt);
+            //string msg = PrintByteArray(usbpkt);
             //Console.WriteLine(msg);
             if (!usb.Write(usbpkt, (UInt32)usbpkt.Length, timeout))
             {
@@ -844,7 +848,7 @@ namespace UsbLib
             Array.Copy(arrayhead, 0, usbpkt, 0, arrayhead.Length);
             Array.Copy(cmdpkt, 0, usbpkt, arrayhead.Length, cmdpkt.Length);
 
-            string msg = PrintByteArray(usbpkt);
+            //string msg = PrintByteArray(usbpkt);
             //Console.WriteLine(msg);
             if (!usb.Write(usbpkt, (UInt32)usbpkt.Length, 1000))
             {
@@ -873,7 +877,7 @@ namespace UsbLib
             Array.Copy(arrayhead, 0, usbpkt, 0, arrayhead.Length);
             Array.Copy(cmdpkt, 0, usbpkt, arrayhead.Length, cmdpkt.Length);
 
-            string msg = PrintByteArray(usbpkt);
+            //string msg = PrintByteArray(usbpkt);
             //Console.WriteLine(msg);
 
             byte[] flashid;
@@ -1298,22 +1302,16 @@ namespace UsbLib
             return -1;
         }
 
-        private static string PrintByteArray(byte[] array)
+        public string PrintByteArray(byte[] array)
         {
-            //if (false)
-            //{
+            StringBuilder sb = new StringBuilder();
+            int i;
+            for (i = 0; i < array.Length; i++)
+            {
+                sb.Append(String.Format("{0:X2}", array[i]));
 
-
-            //    StringBuilder sb = new StringBuilder();
-            //    int i;
-            //    for (i = 0; i < array.Length; i++)
-            //    {
-            //        sb.Append(String.Format("{0:X2}", array[i]));
-
-            //    }
-            //    return sb.ToString();
-            //}
-            return null;
+            }
+            return sb.ToString();
         }
 
         public static long GetFileSize(string sFullName)
